@@ -1,0 +1,382 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:vm="clr-namespace:VoceLens.ViewModels"
+             xmlns:models="clr-namespace:VoceLens.Models"
+             x:Class="VoceLens.MainPage"
+             x:DataType="vm:MainViewModel"
+             Title="VoceLens"
+             BackgroundColor="#0F172A">
+
+    <ScrollView>
+        <VerticalStackLayout Spacing="18" Padding="20,24,20,32" MaximumWidthRequest="600">
+
+            <!-- Hero Header -->
+            <Border StrokeThickness="0" StrokeShape="RoundRectangle 20" BackgroundColor="#1E293B" Padding="20">
+                <VerticalStackLayout Spacing="8">
+                    <HorizontalStackLayout Spacing="12" VerticalOptions="Center">
+                        <Border StrokeShape="RoundRectangle 14" BackgroundColor="#4F46E5" WidthRequest="44" HeightRequest="44" VerticalOptions="Center">
+                            <Label Text="🎙️" FontSize="22" HorizontalOptions="Center" VerticalOptions="Center" />
+                        </Border>
+                        <VerticalStackLayout VerticalOptions="Center">
+                            <Label Text="VoceLens" FontSize="22" FontAttributes="Bold" TextColor="White" />
+                            <Label Text="Floating OCR &amp; Mistral Voxtral TTS" FontSize="13" TextColor="#94A3B8" />
+                        </VerticalStackLayout>
+                    </HorizontalStackLayout>
+                </VerticalStackLayout>
+            </Border>
+
+            <!-- Warning Banner if Overlay Permission Missing -->
+            <Border IsVisible="{Binding IsOverlayPermissionMissing}" 
+                    StrokeThickness="1" Stroke="#EF4444" StrokeShape="RoundRectangle 16" BackgroundColor="#450A0A" Padding="16">
+                <VerticalStackLayout Spacing="10">
+                    <Label Text="⚠️ PERMISSION REQUIRED" FontSize="13" FontAttributes="Bold" TextColor="#FCA5A5" />
+                    <Label Text="To display the floating button and OCR frame over other apps, you must allow 'Display over other apps' in Android settings." FontSize="12" TextColor="#FECACA" LineBreakMode="WordWrap" />
+                    <Button Text="Grant 'Display Over Other Apps' Permission" 
+                            Command="{Binding RequestOverlayPermissionCommand}"
+                            BackgroundColor="#DC2626"
+                            TextColor="White"
+                            FontAttributes="Bold"
+                            HeightRequest="44"
+                            CornerRadius="10" />
+                </VerticalStackLayout>
+            </Border>
+
+            <!-- Status Indicator Banner -->
+            <Border StrokeThickness="1" Stroke="#334155" StrokeShape="RoundRectangle 16" BackgroundColor="#1E293B" Padding="16">
+                <VerticalStackLayout Spacing="8">
+                    <HorizontalStackLayout Spacing="8" VerticalOptions="Center">
+                        <BoxView WidthRequest="10" HeightRequest="10" CornerRadius="5" 
+                                 BackgroundColor="#10B981" />
+                        <Label Text="System Status" FontSize="12" FontAttributes="Bold" TextColor="#94A3B8" />
+                    </HorizontalStackLayout>
+                    <Label Text="{Binding StatusMessage}" FontSize="14" TextColor="#F8FAFC" LineBreakMode="WordWrap" />
+                    <Button Text="⏹ Stop &amp; Clear Playback" 
+                            Command="{Binding StopPlaybackAndClearCommand}"
+                            IsVisible="{Binding CanStopPlayback}"
+                            BackgroundColor="#DC2626"
+                            TextColor="White"
+                            FontAttributes="Bold"
+                            CornerRadius="8"
+                            HeightRequest="38"
+                            Margin="0,4,0,0" />
+                </VerticalStackLayout>
+            </Border>
+
+
+            <!-- Screen Crop Margins Configuration -->
+            <Border StrokeThickness="1" Stroke="#334155" StrokeShape="RoundRectangle 20" BackgroundColor="#1E293B" Padding="20">
+                <VerticalStackLayout Spacing="16">
+                    <Grid ColumnDefinitions="*,Auto" VerticalOptions="Center">
+                        <Label Text="SCREEN CROP MARGINS" FontSize="12" FontAttributes="Bold" TextColor="#818CF8" CharacterSpacing="1" VerticalOptions="Center" />
+                        <Button Grid.Column="1" Text="Reset Defaults" Command="{Binding ResetCropMarginsCommand}" FontSize="11" HeightRequest="32" CornerRadius="8" BackgroundColor="#334155" TextColor="#E2E8F0" Padding="12,0" />
+                    </Grid>
+
+                    <!-- Toggle Edge Cropping -->
+                    <Grid ColumnDefinitions="*,Auto" VerticalOptions="Center">
+                        <VerticalStackLayout Spacing="2">
+                            <Label Text="Crop Screen Edges" FontSize="14" FontAttributes="Bold" TextColor="#F1F5F9" />
+                            <Label Text="Trim status bar and navigation bar from OCR" FontSize="12" TextColor="#94A3B8" />
+                        </VerticalStackLayout>
+                        <Switch Grid.Column="1" IsToggled="{Binding IsCropEnabled}" OnColor="#4F46E5" ThumbColor="White" VerticalOptions="Center" />
+                    </Grid>
+
+                    <Label Text="{Binding CropSummaryText}" FontSize="12" FontAttributes="Bold" TextColor="#38BDF8" />
+
+                    <!-- Margin Sliders & Live Preview (Visible when Crop is enabled) -->
+                    <VerticalStackLayout Spacing="14" IsVisible="{Binding IsCropEnabled}">
+                        <!-- Live Interactive Visual Preview of Screen Capture Area -->
+                        <Border StrokeThickness="1" Stroke="#334155" StrokeShape="RoundRectangle 16" BackgroundColor="#0B132B" Padding="14">
+                            <VerticalStackLayout Spacing="12" HorizontalOptions="Fill">
+                                <Label Text="📱 INTERACTIVE CROP CALIBRATION" FontSize="11" FontAttributes="Bold" TextColor="#38BDF8" HorizontalTextAlignment="Center" CharacterSpacing="1" />
+
+                                <!-- Action Buttons to Take / Load Screenshot of Target App -->
+                                <Grid ColumnDefinitions="*,*" ColumnSpacing="8" HorizontalOptions="Fill">
+                                    <Button Grid.Column="0"
+                                            Text="📸 Reader Screenshot" 
+                                            Command="{Binding CaptureTargetAppCalibrationCommand}"
+                                            BackgroundColor="#4F46E5"
+                                            TextColor="White"
+                                            FontSize="11"
+                                            FontAttributes="Bold"
+                                            CornerRadius="8"
+                                            HeightRequest="40"
+                                            Padding="4,0" />
+                                    <Button Grid.Column="1"
+                                            Text="🔄 Last Screenshot" 
+                                            Command="{Binding LoadLastScreenshotCalibrationCommand}"
+                                            BackgroundColor="#334155"
+                                            TextColor="#F8FAFC"
+                                            FontSize="11"
+                                            CornerRadius="8"
+                                            HeightRequest="40"
+                                            Padding="4,0" />
+                                </Grid>
+
+                                <!-- Smartphone Mockup Bezel -->
+                                <Border WidthRequest="188" HeightRequest="368" BackgroundColor="#020617" Stroke="#475569" StrokeThickness="3" StrokeShape="RoundRectangle 24" Padding="4" HorizontalOptions="Center">
+                                    <Grid>
+                                        <!-- Screen surface -->
+                                        <Border BackgroundColor="#0F172A" StrokeShape="RoundRectangle 20" StrokeThickness="0">
+                                            <Grid>
+                                                <!-- Real app screenshot if captured -->
+                                                <Image Source="{Binding CalibrationScreenshot}"
+                                                       IsVisible="{Binding HasCalibrationScreenshot}"
+                                                       Aspect="AspectFill"
+                                                       HorizontalOptions="Fill"
+                                                       VerticalOptions="Fill" />
+
+                                                <!-- Fallback simulated page content lines if no screenshot captured yet -->
+                                                <VerticalStackLayout Spacing="8" Padding="12,24,12,12" Opacity="0.35" VerticalOptions="Fill" IsVisible="{Binding ShowPlaceholderMockup}">
+                                                    <BoxView HeightRequest="12" CornerRadius="3" Color="#94A3B8" HorizontalOptions="Fill" />
+                                                    <BoxView HeightRequest="8" WidthRequest="100" CornerRadius="2" Color="#64748B" HorizontalOptions="Start" />
+                                                    <BoxView HeightRequest="8" WidthRequest="130" CornerRadius="2" Color="#64748B" HorizontalOptions="Start" />
+                                                    <BoxView HeightRequest="8" WidthRequest="85" CornerRadius="2" Color="#64748B" HorizontalOptions="Start" />
+                                                    <BoxView HeightRequest="34" CornerRadius="4" Color="#334155" HorizontalOptions="Fill" Margin="0,4" />
+                                                    <BoxView HeightRequest="8" WidthRequest="120" CornerRadius="2" Color="#64748B" HorizontalOptions="Start" />
+                                                    <BoxView HeightRequest="8" WidthRequest="95" CornerRadius="2" Color="#64748B" HorizontalOptions="Start" />
+                                                    <BoxView HeightRequest="8" WidthRequest="135" CornerRadius="2" Color="#64748B" HorizontalOptions="Start" />
+                                                    <BoxView HeightRequest="8" WidthRequest="110" CornerRadius="2" Color="#64748B" HorizontalOptions="Start" />
+                                                </VerticalStackLayout>
+
+                                                <!-- Semi-transparent red bars showing excluded cropped margins -->
+                                                <!-- Top Margin Excluded Bar -->
+                                                <BoxView HeightRequest="{Binding PreviewTopMarginHeight}"
+                                                         BackgroundColor="#A6EF4444"
+                                                         VerticalOptions="Start"
+                                                         HorizontalOptions="Fill" />
+
+                                                <!-- Bottom Margin Excluded Bar -->
+                                                <BoxView HeightRequest="{Binding PreviewBottomMarginHeight}"
+                                                         BackgroundColor="#A6EF4444"
+                                                         VerticalOptions="End"
+                                                         HorizontalOptions="Fill" />
+
+                                                <!-- Left Margin Excluded Bar -->
+                                                <BoxView WidthRequest="{Binding PreviewLeftMarginWidth}"
+                                                         BackgroundColor="#A6EF4444"
+                                                         HorizontalOptions="Start"
+                                                         VerticalOptions="Fill" />
+
+                                                <!-- Right Margin Excluded Bar -->
+                                                <BoxView WidthRequest="{Binding PreviewRightMarginWidth}"
+                                                         BackgroundColor="#A6EF4444"
+                                                         HorizontalOptions="End"
+                                                         VerticalOptions="Fill" />
+
+                                                <!-- Dynamic Active Captured OCR Area with Emerald Border -->
+                                                <Border Margin="{Binding PreviewCropMargin}"
+                                                        Stroke="#10B981"
+                                                        StrokeThickness="2.5"
+                                                        StrokeShape="RoundRectangle 8"
+                                                        BackgroundColor="#1810B981"
+                                                        HorizontalOptions="Fill"
+                                                        VerticalOptions="Fill">
+                                                    <VerticalStackLayout VerticalOptions="Center" HorizontalOptions="Center" Spacing="2">
+                                                        <Border BackgroundColor="#CC020617" StrokeThickness="0" StrokeShape="RoundRectangle 6" Padding="6,2">
+                                                            <Label Text="📸 OCR AREA" FontSize="10" FontAttributes="Bold" TextColor="#34D399" HorizontalTextAlignment="Center" />
+                                                        </Border>
+                                                    </VerticalStackLayout>
+                                                </Border>
+
+                                                <!-- Top Notch / Ear Speaker -->
+                                                <BoxView WidthRequest="40" HeightRequest="4" CornerRadius="2" Color="#64748B" HorizontalOptions="Center" VerticalOptions="Start" Margin="0,5,0,0" />
+
+                                                <!-- Bottom Gesture Indicator Bar -->
+                                                <BoxView WidthRequest="46" HeightRequest="3" CornerRadius="1.5" Color="#64748B" HorizontalOptions="Center" VerticalOptions="End" Margin="0,0,0,4" />
+                                            </Grid>
+                                        </Border>
+                                    </Grid>
+                                </Border>
+
+                                <!-- Dimensions badge below phone mockup -->
+                                <Border BackgroundColor="#0F172A" Stroke="#334155" StrokeThickness="1" StrokeShape="RoundRectangle 8" Padding="12,5" HorizontalOptions="Center">
+                                    <Label Text="{Binding PreviewCropInfoText}" FontSize="11" FontAttributes="Bold" TextColor="#34D399" HorizontalTextAlignment="Center" />
+                                </Border>
+                            </VerticalStackLayout>
+                        </Border>
+
+                        <!-- Top Margin -->
+                        <VerticalStackLayout Spacing="4">
+                            <Grid ColumnDefinitions="*,Auto">
+                                <Label Text="Top Margin (Status bar / Toolbar)" FontSize="12" TextColor="#CBD5E1" />
+                                <Label Grid.Column="1" Text="{Binding CropTopPercent, StringFormat='{0}%'}" FontSize="12" FontAttributes="Bold" TextColor="#A5B4FC" />
+                            </Grid>
+                            <Slider Minimum="0" Maximum="40" Value="{Binding CropTopPercent}" MinimumTrackColor="#6366F1" MaximumTrackColor="#334155" ThumbColor="#818CF8" />
+                        </VerticalStackLayout>
+
+                        <!-- Bottom Margin -->
+                        <VerticalStackLayout Spacing="4">
+                            <Grid ColumnDefinitions="*,Auto">
+                                <Label Text="Bottom Margin (Navigation / Gestures)" FontSize="12" TextColor="#CBD5E1" />
+                                <Label Grid.Column="1" Text="{Binding CropBottomPercent, StringFormat='{0}%'}" FontSize="12" FontAttributes="Bold" TextColor="#A5B4FC" />
+                            </Grid>
+                            <Slider Minimum="0" Maximum="40" Value="{Binding CropBottomPercent}" MinimumTrackColor="#6366F1" MaximumTrackColor="#334155" ThumbColor="#818CF8" />
+                        </VerticalStackLayout>
+
+                        <!-- Left Margin -->
+                        <VerticalStackLayout Spacing="4">
+                            <Grid ColumnDefinitions="*,Auto">
+                                <Label Text="Left Margin" FontSize="12" TextColor="#CBD5E1" />
+                                <Label Grid.Column="1" Text="{Binding CropLeftPercent, StringFormat='{0}%'}" FontSize="12" FontAttributes="Bold" TextColor="#A5B4FC" />
+                            </Grid>
+                            <Slider Minimum="0" Maximum="35" Value="{Binding CropLeftPercent}" MinimumTrackColor="#6366F1" MaximumTrackColor="#334155" ThumbColor="#818CF8" />
+                        </VerticalStackLayout>
+
+                        <!-- Right Margin -->
+                        <VerticalStackLayout Spacing="4">
+                            <Grid ColumnDefinitions="*,Auto">
+                                <Label Text="Right Margin" FontSize="12" TextColor="#CBD5E1" />
+                                <Label Grid.Column="1" Text="{Binding CropRightPercent, StringFormat='{0}%'}" FontSize="12" FontAttributes="Bold" TextColor="#A5B4FC" />
+                            </Grid>
+                            <Slider Minimum="0" Maximum="35" Value="{Binding CropRightPercent}" MinimumTrackColor="#6366F1" MaximumTrackColor="#334155" ThumbColor="#818CF8" />
+                        </VerticalStackLayout>
+                    </VerticalStackLayout>
+                </VerticalStackLayout>
+            </Border>
+
+            <!-- Mistral Cloud Configuration (Same as Voce) -->
+            <Border StrokeThickness="1" Stroke="#334155" StrokeShape="RoundRectangle 20" BackgroundColor="#1E293B" Padding="20">
+                <VerticalStackLayout Spacing="16">
+                    <Label Text="MISTRAL AI CONFIGURATION" FontSize="12" FontAttributes="Bold" TextColor="#818CF8" CharacterSpacing="1" />
+
+                    <!-- API Key Entry -->
+                    <VerticalStackLayout Spacing="6">
+                        <Label Text="Mistral API Key" FontSize="13" FontAttributes="Bold" TextColor="#E2E8F0" />
+                        <Border StrokeThickness="1" Stroke="#475569" StrokeShape="RoundRectangle 12" BackgroundColor="#0F172A" Padding="12,0">
+                            <Entry Text="{Binding ApiKey}" 
+                                   TextChanged="OnApiKeyTextChanged"
+                                   Placeholder="Enter your Mistral API key (e.g. sk-...)" 
+                                   PlaceholderColor="#64748B"
+                                   TextColor="White"
+                                   IsPassword="True"
+                                   FontSize="14"
+                                   HeightRequest="48" />
+                        </Border>
+                    </VerticalStackLayout>
+
+                    <!-- Fetch Voices & Voice Picker (Voce methodology) -->
+                    <VerticalStackLayout Spacing="8">
+                        <HorizontalStackLayout HorizontalOptions="Fill" VerticalOptions="Center">
+                            <Label Text="Select Voice (Your Custom Voices)" FontSize="13" FontAttributes="Bold" TextColor="#E2E8F0" VerticalOptions="Center" />
+                        </HorizontalStackLayout>
+
+                        <!-- Robust Fetch Voices Button without disabled lock -->
+                        <Button Text="{Binding FetchVoicesButtonText}" 
+                                Command="{Binding FetchVoicesCommand}" 
+                                BackgroundColor="#334155" 
+                                TextColor="#F8FAFC" 
+                                FontSize="13" 
+                                FontAttributes="Bold"
+                                HeightRequest="46" 
+                                CornerRadius="12" />
+
+                        <ActivityIndicator IsRunning="{Binding IsLoadingVoices}" IsVisible="{Binding IsLoadingVoices}" Color="#818CF8" />
+
+                        <Border StrokeThickness="1" Stroke="#475569" StrokeShape="RoundRectangle 12" BackgroundColor="#0F172A" Padding="12,4">
+                            <Picker ItemsSource="{Binding Voices}"
+                                    ItemDisplayBinding="{Binding DisplayName}"
+                                    SelectedItem="{Binding SelectedVoice}"
+                                    Title="Choose your Mistral voice"
+                                    TitleColor="#64748B"
+                                    TextColor="White"
+                                    FontSize="14" />
+                        </Border>
+                    </VerticalStackLayout>
+
+                    <!-- Models & Chunking -->
+                    <Grid ColumnDefinitions="*,*" ColumnSpacing="12">
+                        <VerticalStackLayout Grid.Column="0" Spacing="6">
+                            <Label Text="OCR Model" FontSize="12" TextColor="#94A3B8" />
+                            <Border StrokeThickness="1" Stroke="#475569" StrokeShape="RoundRectangle 10" BackgroundColor="#0F172A" Padding="10,0">
+                                <Entry Text="{Binding OcrModel}" TextColor="White" FontSize="12" HeightRequest="40" />
+                            </Border>
+                        </VerticalStackLayout>
+
+                        <VerticalStackLayout Grid.Column="1" Spacing="6">
+                            <Label Text="TTS Model" FontSize="12" TextColor="#94A3B8" />
+                            <Border StrokeThickness="1" Stroke="#475569" StrokeShape="RoundRectangle 10" BackgroundColor="#0F172A" Padding="10,0">
+                                <Entry Text="{Binding TtsModel}" TextColor="White" FontSize="12" HeightRequest="40" />
+                            </Border>
+                        </VerticalStackLayout>
+                    </Grid>
+
+                    <Grid ColumnDefinitions="*,Auto" VerticalOptions="Center">
+                        <VerticalStackLayout Grid.Column="0" Spacing="2">
+                            <Label Text="Max Chunk Size (chars)" FontSize="13" FontAttributes="Bold" TextColor="#E2E8F0" />
+                            <Label Text="Optimal ~1000 chars (&lt; 300 words recommended by Mistral)" FontSize="11" TextColor="#64748B" />
+                        </VerticalStackLayout>
+                        <Border Grid.Column="1" StrokeThickness="1" Stroke="#475569" StrokeShape="RoundRectangle 10" BackgroundColor="#0F172A" Padding="12,0" WidthRequest="90">
+                            <Entry Text="{Binding MaxChunkLength}" Keyboard="Numeric" TextColor="White" FontSize="13" HeightRequest="40" HorizontalTextAlignment="Center" />
+                        </Border>
+                    </Grid>
+
+                    <Grid ColumnDefinitions="*,Auto" VerticalOptions="Center">
+                        <VerticalStackLayout Grid.Column="0" Spacing="2">
+                            <Label Text="Autoplay Next Part" FontSize="13" FontAttributes="Bold" TextColor="#E2E8F0" />
+                            <Label Text="Automatically play consecutive sentences" FontSize="11" TextColor="#64748B" />
+                        </VerticalStackLayout>
+                        <Switch Grid.Column="1" IsToggled="{Binding AutoPlay}" OnColor="#4F46E5" ThumbColor="White" />
+                    </Grid>
+
+                </VerticalStackLayout>
+            </Border>
+
+            <!-- Last Extracted OCR Text Display -->
+            <Border StrokeThickness="1" Stroke="#334155" StrokeShape="RoundRectangle 20" BackgroundColor="#1E293B" Padding="20">
+                <VerticalStackLayout Spacing="10">
+                    <Label Text="LAST EXTRACTED OCR TEXT" FontSize="12" FontAttributes="Bold" TextColor="#818CF8" CharacterSpacing="1" />
+                    <Border StrokeThickness="1" Stroke="#475569" StrokeShape="RoundRectangle 12" BackgroundColor="#0F172A" Padding="14" MinimumHeightRequest="80">
+                        <Label Text="{Binding ExtractedText}" TextColor="#E2E8F0" FontSize="13" LineBreakMode="WordWrap" />
+                    </Border>
+                </VerticalStackLayout>
+            </Border>
+
+            <!-- Application Event Log (Recent 500 entries) -->
+            <Border StrokeThickness="1" Stroke="#334155" StrokeShape="RoundRectangle 20" BackgroundColor="#1E293B" Padding="20">
+                <VerticalStackLayout Spacing="12">
+                    <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="8" VerticalOptions="Center">
+                        <HorizontalStackLayout Grid.Column="0" Spacing="6" VerticalOptions="Center">
+                            <Label Text="APPLICATION LOG" FontSize="12" FontAttributes="Bold" TextColor="#818CF8" CharacterSpacing="1" VerticalOptions="Center" />
+                            <Label Text="{Binding LogCountText}" FontSize="11" TextColor="#64748B" VerticalOptions="Center" />
+                        </HorizontalStackLayout>
+                        
+                        <Button Grid.Column="1"
+                                Text="📋 Copy"
+                                Command="{Binding CopyLogsCommand}"
+                                BackgroundColor="#334155"
+                                TextColor="#F8FAFC"
+                                FontSize="11"
+                                FontAttributes="Bold"
+                                HeightRequest="32"
+                                Padding="10,0"
+                                CornerRadius="8" />
+
+                        <Button Grid.Column="2"
+                                Text="🗑️ Clear"
+                                Command="{Binding ClearLogsCommand}"
+                                BackgroundColor="#450A0A"
+                                TextColor="#F87171"
+                                FontSize="11"
+                                FontAttributes="Bold"
+                                HeightRequest="32"
+                                Padding="10,0"
+                                CornerRadius="8" />
+                    </Grid>
+
+                    <Border StrokeThickness="1" Stroke="#334155" StrokeShape="RoundRectangle 12" BackgroundColor="#020617" Padding="12" HeightRequest="240">
+                        <ScrollView VerticalScrollBarVisibility="Always">
+                            <Label Text="{Binding FormattedLogs}"
+                                   FontFamily="monospace"
+                                   FontSize="11"
+                                   TextColor="#94A3B8"
+                                   LineBreakMode="WordWrap" />
+                        </ScrollView>
+                    </Border>
+                </VerticalStackLayout>
+            </Border>
+
+        </VerticalStackLayout>
+    </ScrollView>
+
+</ContentPage>

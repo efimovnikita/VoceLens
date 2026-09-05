@@ -1,0 +1,43 @@
+## Visual Studio / .NET Build Artifacts
+[Bb]in/
+[Oo]bj/
+out/
+[Tt]emp/
+
+## Visual Studio Cache & User Files
+.vs/
+*.user
+*.userosscache
+*.suo
+*.userprefs
+*.sln.docstates
+*.DotSettings.user
+
+## Visual Studio Code & JetBrains
+.vscode/
+.idea/
+*.sln.iml
+
+## Android Packaging & Keys
+*.apk
+*.aab
+*.keystore
+*.jks
+*.pfx
+*.p12
+
+## MAUI / Resizetizer Generated Files
+*.resizetizer.*
+
+## Logs & Temp files
+*.log
+*.tmp
+*.bak
+*.swp
+*~
+
+## OS Metadata
+Thumbs.db
+ehthumbs.db
+[Dd]esktop.ini
+.DS_Store
