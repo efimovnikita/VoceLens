@@ -232,19 +232,36 @@ public static class ScreenCaptureManager
             }
 
             // 2. Acquire frame from active ImageReader
+            // Drain any pre-existing frames in the buffer queue (which may contain the visible floating button)
+            try
+            {
+                AndroidMedia.Image? stale;
+                while ((stale = _activeImageReader.AcquireNextImage()) != null)
+                {
+                    stale.Close();
+                    stale.Dispose();
+                }
+            }
+            catch { }
+
             // Temporarily hide floating overlay so it never appears in the screenshot/OCR
-            FloatingOverlayService.Instance?.SetOverlayVisible(false);
-            await Task.Delay(120);
+            if (FloatingOverlayService.Instance != null)
+            {
+                await FloatingOverlayService.Instance.SetOverlayVisibleAsync(false);
+            }
+
+            // Allow WindowManager and SurfaceFlinger enough time to composite the screen without the overlay
+            await Task.Delay(250);
 
             AndroidMedia.Image? image = null;
             try
             {
-                for (int i = 0; i < 25; i++)
+                for (int i = 0; i < 30; i++)
                 {
                     image = _activeImageReader.AcquireLatestImage();
                     if (image != null)
                         break;
-                    await Task.Delay(30);
+                    await Task.Delay(25);
                 }
 
                 if (image == null)

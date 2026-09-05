@@ -49,6 +49,7 @@ public class AudioPlaybackManager : IAudioPlaybackManager
         _cachedAudioFiles.Clear();
         _currentIndex = -1;
 
+        fullText = TextSanitizer.SanitizeOcrTranscript(fullText);
         if (string.IsNullOrWhiteSpace(fullText))
         {
             UpdateState(AppProcessingState.Idle, "No text provided.");

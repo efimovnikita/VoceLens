@@ -1,5 +1,6 @@
 using VoceLens.Models;
 using VoceLens.Services.Audio;
+using VoceLens.Services.Chunking;
 using VoceLens.Services.Logging;
 using VoceLens.Services.Mistral;
 using VoceLens.Services.Overlay;
@@ -94,11 +95,11 @@ public class OcrSpeechWorkflowController : IOcrSpeechWorkflowController
                 _settingsService.OcrModel,
                 cancellationToken);
 
-            _lastExtractedText = extractedText?.Trim() ?? string.Empty;
+            _lastExtractedText = TextSanitizer.SanitizeOcrTranscript(extractedText);
 
             if (string.IsNullOrWhiteSpace(_lastExtractedText))
             {
-                AppLog.Warn("Mistral OCR completed: no text detected on the image.", "MistralOCR");
+                AppLog.Warn("Mistral OCR completed: no readable text detected on the image.", "MistralOCR");
                 UpdateState(AppProcessingState.Idle, "No text detected on the image.");
                 return;
             }
@@ -124,7 +125,7 @@ public class OcrSpeechWorkflowController : IOcrSpeechWorkflowController
             return;
         }
 
-        _lastExtractedText = text.Trim();
+        _lastExtractedText = TextSanitizer.SanitizeOcrTranscript(text);
         await _audioPlaybackManager.StartReadingTextAsync(_lastExtractedText, cancellationToken);
     }
 

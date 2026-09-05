@@ -20,6 +20,10 @@ public class TextChunker : ITextChunker
         if (string.IsNullOrWhiteSpace(text))
             return new List<string>();
 
+        text = TextSanitizer.SanitizeOcrTranscript(text);
+        if (string.IsNullOrWhiteSpace(text))
+            return new List<string>();
+
         if (maxChunkLength <= 0)
             maxChunkLength = 1000;
 

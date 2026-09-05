@@ -610,15 +610,48 @@ public class FloatingOverlayService : Service, View.IOnTouchListener
     {
     }
 
+    public Task SetOverlayVisibleAsync(bool visible)
+    {
+        var tcs = new TaskCompletionSource<bool>();
+
+        void ApplyVisibility()
+        {
+            try
+            {
+                if (_containerView != null && _windowManager != null && _buttonLayoutParams != null)
+                {
+                    _containerView.Visibility = visible ? ViewStates.Visible : ViewStates.Gone;
+                    _buttonLayoutParams.Alpha = visible ? 1.0f : 0.0f;
+                    _windowManager.UpdateViewLayout(_containerView, _buttonLayoutParams);
+                }
+                else if (_containerView != null)
+                {
+                    _containerView.Visibility = visible ? ViewStates.Visible : ViewStates.Gone;
+                }
+                tcs.TrySetResult(true);
+            }
+            catch (Exception ex)
+            {
+                Log.Warn(TAG, $"Failed to set overlay visibility: {ex.Message}");
+                tcs.TrySetResult(false);
+            }
+        }
+
+        if (MainThread.IsMainThread)
+        {
+            ApplyVisibility();
+        }
+        else
+        {
+            MainThread.BeginInvokeOnMainThread(ApplyVisibility);
+        }
+
+        return tcs.Task;
+    }
+
     public void SetOverlayVisible(bool visible)
     {
-        MainThread.BeginInvokeOnMainThread(() =>
-        {
-            if (_containerView != null)
-            {
-                _containerView.Visibility = visible ? ViewStates.Visible : ViewStates.Invisible;
-            }
-        });
+        _ = SetOverlayVisibleAsync(visible);
     }
 
     public override void OnDestroy()
