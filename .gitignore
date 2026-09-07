@@ -25,6 +25,7 @@ out/
 *.jks
 *.pfx
 *.p12
+*-credentials.txt
 
 ## MAUI / Resizetizer Generated Files
 *.resizetizer.*
