@@ -1,171 +1,171 @@
 # VoceLens 🎙️🔍
 
-**VoceLens** — это Android-приложение на базе **.NET MAUI (C# 13, .NET 10)**, разработанное в виде плавающего интеллектуального ассистента чтения (**Floating Button / System Alert Window**) поверх любых сторонних приложений (читалок книг, веб-браузеров, Telegram, документов PDF/FB2/ePub).
+**VoceLens** is an Android application built on **.NET MAUI (C# 13, .NET 10)**, engineered as an intelligent floating reading assistant (**Floating Button / System Alert Window**) that runs seamlessly on top of any third-party app (e-book readers, web browsers, Telegram, PDF/FB2/ePub documents).
 
-Приложение захватывает экран, отправляет его в **Mistral OCR** для распознавания текста, очищает транскрипт от графических Markdown-артефактов, разбивает текст на смысловые фрагменты по границам предложений, синтезирует естественную речь через **Mistral TTS (Voxtral)** и воспроизводит аудиопоток в фоновом режиме с предзагрузкой следующих фрагментов.
+The app captures the screen, transmits it to **Mistral OCR** for high-precision text recognition, cleanses the transcript of graphic Markdown artifacts, intelligently segments text along sentence boundaries, synthesizes lifelike speech via **Mistral TTS (Voxtral)**, and streams audio in the background with continuous preloading of upcoming chunks.
 
 ---
 
-## 🌟 Ключевые возможности
+## 🌟 Key Features
 
-### 1. 🔘 Интеллектуальная плавающая кнопка (Floating Button)
-- **Всегда под рукой**: отображается поверх всех окон и легко перетаскивается в любое удобное место экрана.
-- **Интуитивное управление жестами**:
-  - **Одиночный тап**:
-    - *В режиме ожидания* — мгновенный захват экрана под кнопкой ➔ OCR ➔ очистка ➔ чанкинг ➔ озвучивание.
-    - *Во время воспроизведения* — пауза / возобновление чтения.
-  - **Быстрый двойной тап**: мгновенная остановка чтения и сброс очереди чанков (`Stop & Clear`).
-  - **Красная мини-кнопка «Стоп»**: аккуратная кнопка с белым квадратом, появляющаяся в верхнем углу плавающего оверлея во время воспроизведения для быстрой остановки в один клик.
-  - **Долгое нажатие (удержание 550 мс)**: полное закрытие приложения (`Close & Exit`) — скрывает плавающую кнопку, останавливает мониторинг экрана Android, выгружает службу из памяти и закрывает процесс.
-- **Цветовая индикация состояния**:
-  - 🟣 **Фиолетовый (Ready)** — готов к захвату экрана.
-  - 🟠 **Оранжевый (Capturing)** — создание скриншота.
-  - 🟡 **Желтый (Scanning OCR)** — распознавание текста через Mistral OCR.
-  - 🔵 **Синий (Chunking)** — разбивка текста на смысловые предложения.
-  - 🩵 **Голубой (Generating Audio)** — синтез речи через Mistral TTS с индикатором прогресса (например, `1/4`).
-  - 🟢 **Зеленый (Playing)** — воспроизведение аудио.
-  - 🔴 **Красный (Error)** — индикация ошибки с автосбросом.
+### 1. 🔘 Intelligent Floating Button
+- **Always Accessible**: Floats above all apps and effortlessly drags to any position on the screen.
+- **Intuitive Gesture Controls**:
+  - **Single Tap**:
+    - *When idle* — captures screen under the button ➔ OCR ➔ sanitization ➔ chunking ➔ speech playback.
+    - *During playback* — pause / resume reading.
+  - **Quick Double Tap**: instantly stops reading and clears the chunk queue (`Stop & Clear`).
+  - **Mini Red Stop Button**: a sleek circular button with a centered white square appearing in the top corner of the overlay during playback for one-click termination.
+  - **Long Press (Hold 550 ms)**: full application shutdown (`Close & Exit`) — hides the floating button, terminates Android screen monitoring (`MediaProjection`), unloads foreground services, and exits the process.
+- **Dynamic Color Status Feedback**:
+  - 🟣 **Purple (Ready)** — idle, ready to capture.
+  - 🟠 **Orange (Capturing)** — grabbing screen frame.
+  - 🟡 **Yellow (Scanning OCR)** — recognizing text via Mistral OCR.
+  - 🔵 **Blue (Chunking)** — intelligent sentence splitting.
+  - 🩵 **Cyan (Generating Audio)** — synthesizing speech with progress indicator (e.g. `1/4`).
+  - 🟢 **Green (Playing)** — active audio playback.
+  - 🔴 **Red (Error)** — error indicator with automatic status recovery.
 
-### 2. 🛡️ Защита от артефактов и надежный захват экрана
-- **Гарантированное исключение кнопки из скриншота**: перед съемкой экрана очередь кадров `ImageReader` очищается, оверлей мгновенно становится прозрачным (`Alpha = 0`), а задержка синхронизации с системным композитором Android (`SurfaceFlinger`) исключает попадание элементов интерфейса кнопки в объектив OCR.
-- **Интеллектуальный санитайзер (`TextSanitizer`)**: автоматически вырезает любые служебные Markdown-теги картинок вида `![img-0.jpeg](img-0.jpeg)`, которые Mistral OCR генерирует при обнаружении иконок или иллюстраций. В результате TTS никогда не зачитывает технический синтаксис вслух.
-- **Сессия MediaProjection без спама диалогами**: захват экрана инициализируется один раз и переиспользуется без повторных запросов системных разрешений Android 14+.
+### 2. 🛡️ Artifact Defense & Reliable Capture
+- **Guaranteed Button Concealment**: Before capturing the screen, all queued buffer frames in `ImageReader` are drained, overlay opacity is set to zero (`Alpha = 0`), and a 250 ms sync delay ensures Android's `SurfaceFlinger` compositor renders the underlying content without any button artifacts.
+- **Smart Text Sanitizer (`TextSanitizer`)**: Automatically strips Markdown image tags such as `![img-0.jpeg](img-0.jpeg)` produced by Mistral OCR when icons, illustrations, or graphics are detected. This ensures Text-to-Speech never vocalizes technical markup.
+- **Persistent MediaProjection Session**: Virtual display and projection sessions are established once and reused indefinitely, avoiding repetitive system permission prompts on Android 14+.
 
-### 3. 📱 Интерактивная калибровка полей обрезки (Interactive Crop Calibration)
-- Позволяет исключить из чтения верхнюю строку состояния Android, заголовок книги, панель навигации и номера страниц.
-- **Интерактивный макет экрана в главном окне**:
-  - Кнопка **«📸 Reader Screenshot»**: сворачивает VoceLens, делает реальный скриншот вашей читалки и возвращает его в окно калибровки.
-  - Кнопка **«🔄 Last Screenshot»**: загружает для настройки последний захваченный снимок.
-  - Наглядные красные полупрозрачные полосы отсечения поверх макета.
-  - Удобные процентные слайдеры для точной настройки полей: Top, Bottom, Left, Right.
+### 3. 📱 Interactive Crop Calibration
+- Exclude the Android status bar, book title headers, navigation bar, and page numbers from recognition.
+- **Interactive Smartphone Bezel Mockup in Main UI**:
+  - **«📸 Reader Screenshot»**: minimizes VoceLens, captures the active e-reader screen, and returns directly to the calibration view.
+  - **«🔄 Last Screenshot»**: loads the most recently captured screen frame.
+  - **Visual Exclusion Bars**: semi-transparent red overlays highlight excluded margins in real time.
+  - **Percentage-Based Sliders**: fine-tune Top, Bottom, Left, and Right margins with immediate feedback.
 
-### 4. 🧠 Интеграция с API Mistral AI (по стандартам проекта Voce)
+### 4. 🧠 Mistral AI Cloud Integration
 - **Mistral OCR**:
-  - Модель по умолчанию: `mistral-ocr-latest`.
-  - Передача изображений в Base64 Data URL.
-  - Извлечение структурированного Markdown.
-- **Синтез речи (Mistral TTS)**:
-  - Модель: `voxtral-mini-tts-2603`.
-  - Формат: MP3.
-  - Предзагрузка (Preloading) следующего фрагмента аудио во время проигрывания текущего — воспроизведение идет непрерывно без пауз между предложениями.
-- **Поддержка клонированных голосов пользователя**:
-  - Получение списка личных голосов из профиля Mistral (`user_id`).
-  - Удобный выбор активного голоса в выпадающем списке настроек.
-- **Интеллектуальный чанкинг (`splitIntoChunks`)**:
-  - Алгоритм разбивки текста по границам предложений (`.`, `!`, `?`) с контролем максимальной длины (Max Chunk Size) без разрезания слов.
+  - Default model: `mistral-ocr-latest`.
+  - Base64 Data URL transport.
+  - Structured Markdown output extraction.
+- **Mistral Text-to-Speech (TTS)**:
+  - Model: `voxtral-mini-tts-2603`.
+  - High-fidelity MP3 streaming.
+  - **Continuous Preloading**: automatically requests and caches the next audio chunk while the current one is playing, ensuring smooth, seamless reading without gaps between sentences.
+- **Cloned Custom Voices Support**:
+  - Queries user-specific cloned voices (`user_id`).
+  - Interactive voice selector dropdown in settings.
+- **Intelligent Chunking (`splitIntoChunks`)**:
+  - Preserves grammatical sentence boundaries (`.`, `!`, `?`) and enforces character limits without cutting words in half.
 
-### 5. 📋 Журнал событий и мониторинг в реальном времени
-- **LAST EXTRACTED OCR TEXT**: блок в главном окне, отображающий последний распознанный и очищенный текст.
-- **APPLICATION LOG**: встроенный консольный терминал последних событий с цветовой дифференциацией (`INFO`, `WARN`, `ERROR`), счетчиком записей и кнопками:
-  - **«📋 Copy»** — копирование всей истории логов в буфер обмена для отладки.
-  - **«🗑️ Clear»** — мгновенная очистка терминала.
+### 5. 📋 Real-Time Event Log & Transcript Display
+- **LAST EXTRACTED OCR TEXT**: displays the latest recognized and sanitized text directly on the dashboard.
+- **APPLICATION LOG**: embedded scrollable terminal showing the last 500 diagnostic events with level-based color coding (`INFO`, `WARN`, `ERROR`):
+  - **«📋 Copy»** — copies complete event history to the clipboard.
+  - **«🗑️ Clear»** — clears terminal buffer immediately.
 
 ---
 
-## 🏗 Архитектура проекта
+## 🏗 Project Architecture
 
 ```text
 VoceLens/
 ├── Models/
-│   ├── AppState.cs                 # Перечисления состояний и события статуса
-│   ├── OcrModels.cs                # DTO для запросов и ответов Mistral OCR
-│   ├── OverlayBounds.cs            # Модель границ обрезки скриншота (CropFrameBounds)
-│   ├── SpeechModels.cs             # DTO для Mistral TTS (voxtral-mini-tts-2603)
-│   └── VoiceItem.cs                # DTO голосов Mistral API
+│   ├── AppState.cs                 # Workflow states and event args
+│   ├── OcrModels.cs                # Mistral OCR request & response DTOs
+│   ├── OverlayBounds.cs            # CropFrameBounds margin models
+│   ├── SpeechModels.cs             # Mistral TTS request DTOs
+│   └── VoiceItem.cs                # Mistral Voice API models
 ├── Platforms/
 │   └── Android/
 │       ├── Audio/
-│       │   └── AndroidAudioPlayer.cs   # Нативная реализация через Android MediaPlayer
+│       │   └── AndroidAudioPlayer.cs   # Native Android MediaPlayer wrapper
 │       ├── Capture/
-│       │   ├── MediaProjectionPermissionActivity.cs # Прозрачная активность для разрешения на захват
-│       │   └── ScreenCaptureManager.cs # Захват экрана, MediaProjection, обрезка и буфер
+│       │   ├── MediaProjectionPermissionActivity.cs # Invisible permission dispatcher
+│       │   └── ScreenCaptureManager.cs # VirtualDisplay, MediaProjection & frame cropping
 │       └── Overlay/
-│           ├── AndroidFloatingOverlayService.cs # Мост между MAUI и сервисом Android
-│           ├── FloatingOverlayService.cs        # Foreground Service плавающей кнопки и оверлея
-│           └── OverlayPermissionHelper.cs       # Проверка разрешения SYSTEM_ALERT_WINDOW
+│           ├── AndroidFloatingOverlayService.cs # MAUI-to-Android service bridge
+│           ├── FloatingOverlayService.cs        # Foreground Service managing overlay & gestures
+│           └── OverlayPermissionHelper.cs       # SYSTEM_ALERT_WINDOW validator
 ├── Resources/
-│   ├── AppIcon/                    # Адаптивная иконка (Safe Zone Android 12+)
-│   ├── Splash/                     # Центрированный сплэш-скрин на темно-синем фоне (#0B1829)
-│   └── Styles/                     # Цветовая палитра и стили MAUI
+│   ├── AppIcon/                    # Adaptive icon (Safe Zone for Android 12+)
+│   ├── Splash/                     # Splash screen on navy background (#0B1829)
+│   └── Styles/                     # MAUI color palette and control templates
 ├── Services/
 │   ├── Audio/
-│   │   ├── AudioPlaybackManager.cs # Очередь воспроизведения, кэш MP3 и предзагрузка
+│   │   ├── AudioPlaybackManager.cs # Playback queue, MP3 cache & chunk preloader
 │   │   ├── IAudioPlaybackManager.cs
 │   │   └── IPlatformAudioPlayer.cs
 │   ├── Chunking/
 │   │   ├── ITextChunker.cs
-│   │   ├── TextChunker.cs          # Алгоритм splitIntoChunks
-│   │   └── TextSanitizer.cs        # Очистка текста от Markdown-изображений и артефактов OCR
+│   │   ├── TextChunker.cs          # splitIntoChunks sentence boundary splitter
+│   │   └── TextSanitizer.cs        # Regex filter removing OCR markdown image tags
 │   ├── Logging/
-│   │   └── AppLog.cs               # Потокобезопасный кольцевой логгер событий
+│   │   └── AppLog.cs               # Thread-safe in-memory event logger
 │   ├── Mistral/
 │   │   ├── IMistralClient.cs
-│   │   └── MistralClient.cs        # Клиент к эндпоинтам /ocr, /audio/speech, /audio/voices
+│   │   └── MistralClient.cs        # HTTP client for /ocr, /audio/speech, /audio/voices
 │   ├── Overlay/
 │   │   ├── IFloatingOverlayService.cs
 │   │   └── NullFloatingOverlayService.cs
 │   ├── Settings/
-│   │   ├── AppSettingsService.cs   # Персистентное хранение настроек в Preferences
+│   │   ├── AppSettingsService.cs   # Persistent settings via MAUI Preferences
 │   │   └── IAppSettingsService.cs
 │   └── Workflow/
 │       ├── IOcrSpeechWorkflowController.cs
-│       └── OcrSpeechWorkflowController.cs # Главный оркестратор: Экран -> OCR -> Фильтр -> TTS -> Звук
+│       └── OcrSpeechWorkflowController.cs # Orchestrator: Capture -> OCR -> Filter -> TTS -> Audio
 ├── ViewModels/
-│   └── MainViewModel.cs            # ViewModel экрана настроек, калибровки и логов
-├── MainPage.xaml / .cs             # Интерфейс приложения с панелью калибровки и логом
-├── MauiProgram.cs                  # Точка входа, DI-контейнер и регистрация зависимостей
-└── VoceLens.csproj                 # Конфигурация проекта .NET MAUI (net10.0-android)
+│   └── MainViewModel.cs            # Settings, calibration & log view model
+├── MainPage.xaml / .cs             # Main dashboard UI
+├── MauiProgram.cs                  # Entry point, DI container & service registrations
+└── VoceLens.csproj                 # .NET MAUI project file (net10.0-android)
 ```
 
 ---
 
-## 🔒 Разрешения Android
+## 🔒 Android Permissions
 
-Для корректной работы требуются следующие разрешения (запрашиваются в интерфейсе):
-1. **Display over other apps (`SYSTEM_ALERT_WINDOW`)** — для отображения плавающей кнопки поверх читалок и браузеров.
-2. **Screen Capture (`FOREGROUND_SERVICE_MEDIA_PROJECTION`)** — для захвата изображения текста с экрана.
-3. **Фоновая служба (`FOREGROUND_SERVICE`)** — для непрерывного воспроизведения аудио при выключенном экране или свернутом приложении.
-4. **Доступ к сети (`INTERNET`)** — для обращения к Mistral API.
+VoceLens requires the following permissions to operate:
+1. **Display over other apps (`SYSTEM_ALERT_WINDOW`)** — renders the floating button over e-reader apps and web browsers.
+2. **Screen Capture (`FOREGROUND_SERVICE_MEDIA_PROJECTION`)** — captures display frames for OCR processing.
+3. **Foreground Service (`FOREGROUND_SERVICE`)** — prevents Android OS from terminating playback when the screen is turned off.
+4. **Internet Access (`INTERNET`)** — connects to Mistral AI endpoints for OCR and speech generation.
 
 ---
 
-## 🚀 Сборка и установка
+## 🚀 Building & Installation
 
-### Требования
-- [.NET 10 SDK](https://dotnet.microsoft.com/download) с рабочей нагрузкой `maui-android`.
-- Android SDK (API 34/35) и Java SDK 17+.
+### Prerequisites
+- [.NET 10 SDK](https://dotnet.microsoft.com/download) with `maui-android` workload.
+- Android SDK (API 34/35) and Java SDK 17+.
 
-### Сборка через .NET CLI
+### CLI Build
 ```powershell
-# Сборка подписанного пакета для Android
+# Build signed release-ready APK for Android
 dotnet build -f net10.0-android -p:EmbedAssembliesIntoApk=true
 ```
 
-Результат сборки (APK) будет расположен по пути:
+Output APK will be generated at:
 `bin/Debug/net10.0-android/com.companyname.vocelens-Signed.apk`
 
-### Установка на устройство или эмулятор через ADB
+### Install via ADB
 ```powershell
 adb install -r bin/Debug/net10.0-android/com.companyname.vocelens-Signed.apk
 ```
 
 ---
 
-## 📖 Руководство пользователя
+## 📖 User Guide
 
-1. **Первый запуск**:
-   - Откройте **VoceLens**.
-   - Введите ваш **Mistral API Key** (сохраняется локально в безопасном хранилище устройства).
-   - Нажмите **«Fetch Custom Voices»** для загрузки персональных клонированных голосов и выберите голос в выпадающем списке.
-2. **Выдача разрешений**:
-   - Нажмите **«Grant Overlay Permission»** и разрешите приложению показ поверх других окон.
-   - Нажмите **«Authorize Screen Capture»** для разового подтверждения захвата экрана.
-3. **Калибровка полей (по желанию)**:
-   - В блоке **Interactive Crop Calibration** настройте исключаемые поля (статусную строку, полосу навигации и отступы).
-4. **Чтение поверх других приложений**:
-   - Нажмите **«Start Floating Button»** — на экране появится плавающая кнопка VoceLens.
-   - Откройте вашу любимую читалку или браузер.
-   - Нажмите на плавающую кнопку один раз — приложение захватит экран, распознает текст и начнет читать его приятным голосом!
-   - Для паузы нажмите кнопку еще раз.
-   - Для сброса чтения нажмите красную мини-кнопку «Стоп» или дважды быстро коснитесь кнопки.
-   - Для выхода из приложения и отключения мониторинга экрана удерживайте кнопку 550 мс.
+1. **Initial Setup**:
+   - Open **VoceLens**.
+   - Enter your **Mistral API Key** (securely saved in device storage).
+   - Tap **«Fetch Custom Voices»** to load cloned voices and choose your preferred narrator.
+2. **Grant Permissions**:
+   - Tap **«Grant Overlay Permission»** and toggle permission for VoceLens.
+   - Tap **«Authorize Screen Capture»** to approve initial projection access.
+3. **Calibrate Margins (Optional)**:
+   - Under **Interactive Crop Calibration**, adjust exclusion margins (status bar, navigation bar, headers/footers).
+4. **Read Any Content**:
+   - Tap **«Start Floating Button»** — the floating orb appears on your screen.
+   - Open any book reader (Kindle, Moon+ Reader, FBReader), document, or browser page.
+   - Tap the floating button once — VoceLens captures the screen, recognizes the text, and reads aloud smoothly!
+   - Tap once to pause or resume.
+   - Tap the mini red **Stop** button or double-tap the button to reset playback.
+   - Long-press the button (550 ms) to completely exit the app and stop screen monitoring.
