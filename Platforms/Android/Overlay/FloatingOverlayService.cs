@@ -326,17 +326,12 @@ public class FloatingOverlayService : Service, View.IOnTouchListener
                 _initialTouchY = e.RawY;
                 _isLongPressed = false;
 
-                // Long-press detection: holding 550ms cancels & clears playback
+                // Long-press detection: holding 550ms shuts down VoceLens and terminates background monitoring
                 _longPressRunnable = () =>
                 {
                     _isLongPressed = true;
-                    Log.Debug(TAG, ">>> Long press detected on floating button: STOP & CLEAR");
-                    try
-                    {
-                        HapticFeedback.Default.Perform(HapticFeedbackType.LongPress);
-                    }
-                    catch { }
-                    StopAndClearPlayback();
+                    Log.Debug(TAG, ">>> Long press detected on floating button: CLOSE APP & STOP MONITORING");
+                    CloseAppAndExit();
                 };
                 _mainHandler.PostDelayed(_longPressRunnable, 550);
                 return true;
@@ -411,6 +406,85 @@ public class FloatingOverlayService : Service, View.IOnTouchListener
         {
             UpdateFabVisualState(AppProcessingState.Idle, 0, 0);
             Toast.MakeText(this, "⏹ Playback stopped & context cleared", ToastLength.Short)?.Show();
+        });
+    }
+
+    public void CloseAppAndExit()
+    {
+        Log.Debug(TAG, ">>> CloseAppAndExit: Shutting down VoceLens and releasing screen monitoring.");
+        AppLog.Info("🛑 Long press on floating button: closing VoceLens and stopping screen capture", "Overlay");
+
+        try
+        {
+            HapticFeedback.Default.Perform(HapticFeedbackType.LongPress);
+        }
+        catch { }
+
+        try
+        {
+            var workflow = GetWorkflowController();
+            workflow?.StopPlaybackAndClear();
+            _audioPlaybackManager?.Stop();
+        }
+        catch { }
+
+        try
+        {
+            ScreenCaptureManager.ResetSession();
+        }
+        catch { }
+
+        MainThread.BeginInvokeOnMainThread(() =>
+        {
+            try
+            {
+                if (_containerView != null && _windowManager != null)
+                {
+                    _containerView.Visibility = ViewStates.Gone;
+                    _windowManager.RemoveView(_containerView);
+                    _containerView = null;
+                }
+            }
+            catch { }
+
+            try
+            {
+                Toast.MakeText(this, "🛑 VoceLens закрыто", ToastLength.Short)?.Show();
+            }
+            catch { }
+
+            try
+            {
+                var activity = Platform.CurrentActivity;
+                activity?.FinishAffinity();
+            }
+            catch { }
+
+            try
+            {
+                if (Build.VERSION.SdkInt >= BuildVersionCodes.N)
+                {
+                    StopForeground(StopForegroundFlags.Remove);
+                }
+                else
+                {
+#pragma warning disable CS0618
+                    StopForeground(true);
+#pragma warning restore CS0618
+                }
+                StopSelf();
+            }
+            catch { }
+
+            Task.Run(async () =>
+            {
+                await Task.Delay(400);
+                try
+                {
+                    global::Android.OS.Process.KillProcess(global::Android.OS.Process.MyPid());
+                }
+                catch { }
+            });
         });
     }
 
