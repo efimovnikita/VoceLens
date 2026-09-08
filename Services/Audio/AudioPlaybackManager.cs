@@ -1,5 +1,6 @@
 using System.Security.Cryptography;
 using System.Text;
+using System.Text.RegularExpressions;
 using VoceLens.Models;
 using VoceLens.Services.Chunking;
 using VoceLens.Services.Logging;
@@ -21,6 +22,12 @@ public class AudioPlaybackManager : IAudioPlaybackManager
     private int _currentIndex = -1;
     private AppProcessingState _currentState = AppProcessingState.Idle;
     private CancellationTokenSource? _cts;
+
+    private bool _isNativeTtsActive = false;
+    private bool _isPaused = false;
+    private int _currentNativeSentenceIndex = 0;
+    private List<string> _currentNativeSentences = new();
+    private static readonly Regex SentenceRegex = new(@"[^.!?]+[.!?]*|[^.!?]+", RegexOptions.Compiled);
 
     public IReadOnlyList<string> Chunks => _chunks;
     public int CurrentChunkIndex => _currentIndex;
@@ -85,6 +92,13 @@ public class AudioPlaybackManager : IAudioPlaybackManager
             return;
         }
 
+        _isNativeTtsActive = false;
+        _isPaused = false;
+        _currentNativeSentences.Clear();
+        _currentNativeSentenceIndex = 0;
+        _nativeTtsService.Stop();
+        _audioPlayer.Stop();
+
         _currentIndex = index;
         string text = _chunks[_currentIndex];
 
@@ -123,8 +137,16 @@ public class AudioPlaybackManager : IAudioPlaybackManager
         }
         catch (OperationCanceledException)
         {
-            AppLog.Info("Playback was canceled.", "Audio");
-            UpdateState(AppProcessingState.Idle, "Playback canceled.");
+            if (_isPaused)
+            {
+                AppLog.Info("Playback paused.", "Audio");
+                UpdateState(AppProcessingState.Paused, $"Paused at part {_currentIndex + 1}/{_chunks.Count}", _currentIndex, _chunks.Count);
+            }
+            else
+            {
+                AppLog.Info("Playback was canceled.", "Audio");
+                UpdateState(AppProcessingState.Idle, "Playback canceled.");
+            }
         }
         catch (Exception ex)
         {
@@ -141,12 +163,21 @@ public class AudioPlaybackManager : IAudioPlaybackManager
         }
     }
 
-    private async Task PlayChunkWithNativeTtsAsync(int index, string text, CancellationToken cancellationToken)
+    private async Task PlayChunkWithNativeTtsAsync(int index, string text, CancellationToken cancellationToken, int startSentenceIndex = 0)
     {
+        _isNativeTtsActive = true;
+        _isPaused = false;
+        _currentIndex = index;
+        if (_currentNativeSentences.Count == 0 || startSentenceIndex == 0)
+        {
+            _currentNativeSentences = SplitSentences(text);
+        }
+        _currentNativeSentenceIndex = Math.Clamp(startSentenceIndex, 0, _currentNativeSentences.Count);
+
         try
         {
             UpdateState(AppProcessingState.Playing, $"Playing part {index + 1}/{_chunks.Count} (Android TTS Fallback)", index, _chunks.Count);
-            AppLog.Info($"Speaking part {index + 1}/{_chunks.Count} using Android Native TTS fallback ({text.Length} chars)...", "NativeTTS");
+            AppLog.Info($"Speaking part {index + 1}/{_chunks.Count} using Android Native TTS fallback (sentence {_currentNativeSentenceIndex + 1}/{_currentNativeSentences.Count})...", "NativeTTS");
 
             // Also attempt to preload next chunk with Mistral in background
             _ = PreloadNextChunkAsync(index + 1);
@@ -155,34 +186,88 @@ public class AudioPlaybackManager : IAudioPlaybackManager
                 ? _settingsService.FallbackVoiceId
                 : _settingsService.FallbackLanguageCode;
 
-            await _nativeTtsService.SpeakAsync(text, voiceOrLocale, cancellationToken);
-
-            if (!cancellationToken.IsCancellationRequested && _settingsService.AutoPlay)
+            for (int i = _currentNativeSentenceIndex; i < _currentNativeSentences.Count; i++)
             {
-                if (index + 1 < _chunks.Count)
+                if (_isPaused || cancellationToken.IsCancellationRequested)
+                    break;
+
+                _currentNativeSentenceIndex = i;
+                string sentence = _currentNativeSentences[i];
+                if (string.IsNullOrWhiteSpace(sentence))
+                    continue;
+
+                await _nativeTtsService.SpeakAsync(sentence, voiceOrLocale, cancellationToken);
+                _currentNativeSentenceIndex = i + 1;
+            }
+
+            if (_isPaused)
+            {
+                AppLog.Info($"Native TTS paused at part {index + 1}, sentence {_currentNativeSentenceIndex + 1}/{_currentNativeSentences.Count}", "NativeTTS");
+                UpdateState(AppProcessingState.Paused, $"Paused at part {index + 1}/{_chunks.Count}", index, _chunks.Count);
+                return;
+            }
+
+            if (!cancellationToken.IsCancellationRequested)
+            {
+                _isNativeTtsActive = false;
+                _currentNativeSentences.Clear();
+                _currentNativeSentenceIndex = 0;
+
+                if (_settingsService.AutoPlay)
                 {
-                    await PlayChunkAsync(index + 1, cancellationToken);
+                    if (index + 1 < _chunks.Count)
+                    {
+                        await PlayChunkAsync(index + 1, cancellationToken);
+                    }
+                    else
+                    {
+                        UpdateState(AppProcessingState.Idle, "Completed playback of all parts.");
+                    }
                 }
                 else
                 {
-                    UpdateState(AppProcessingState.Idle, "Completed playback of all parts.");
+                    UpdateState(AppProcessingState.Paused, $"Finished part {index + 1}/{_chunks.Count}", index, _chunks.Count);
                 }
-            }
-            else if (!cancellationToken.IsCancellationRequested)
-            {
-                UpdateState(AppProcessingState.Paused, $"Finished part {index + 1}/{_chunks.Count}", index, _chunks.Count);
             }
         }
         catch (OperationCanceledException)
         {
-            AppLog.Info("Native TTS playback canceled.", "Audio");
-            UpdateState(AppProcessingState.Idle, "Playback canceled.");
+            if (_isPaused)
+            {
+                AppLog.Info($"Native TTS paused during speech at part {index + 1}, sentence {_currentNativeSentenceIndex + 1}", "NativeTTS");
+                UpdateState(AppProcessingState.Paused, $"Paused at part {index + 1}/{_chunks.Count}", index, _chunks.Count);
+            }
+            else
+            {
+                _isNativeTtsActive = false;
+                _currentNativeSentences.Clear();
+                _currentNativeSentenceIndex = 0;
+                AppLog.Info("Native TTS playback canceled.", "Audio");
+                UpdateState(AppProcessingState.Idle, "Playback canceled.");
+            }
         }
         catch (Exception ex)
         {
+            _isNativeTtsActive = false;
+            _currentNativeSentences.Clear();
+            _currentNativeSentenceIndex = 0;
             AppLog.Error($"Native TTS playback failed on part {index + 1}: {ex.Message}", ex, "NativeTTS");
             UpdateState(AppProcessingState.Error, $"Native TTS Error: {ex.Message}", index, _chunks.Count);
         }
+    }
+
+    private static List<string> SplitSentences(string text)
+    {
+        if (string.IsNullOrWhiteSpace(text))
+            return new List<string>();
+
+        var matches = SentenceRegex.Matches(text);
+        var list = matches.Select(m => m.Value.Trim()).Where(s => !string.IsNullOrEmpty(s)).ToList();
+        if (list.Count == 0 && !string.IsNullOrWhiteSpace(text))
+        {
+            list.Add(text.Trim());
+        }
+        return list;
     }
 
     private async Task PreloadNextChunkAsync(int nextIndex)
@@ -237,6 +322,7 @@ public class AudioPlaybackManager : IAudioPlaybackManager
 
     public void Pause()
     {
+        _isPaused = true;
         _audioPlayer.Pause();
         _nativeTtsService.Stop();
         UpdateState(AppProcessingState.Paused, $"Paused at part {_currentIndex + 1}/{_chunks.Count}", _currentIndex, _chunks.Count);
@@ -244,12 +330,59 @@ public class AudioPlaybackManager : IAudioPlaybackManager
 
     public void Resume()
     {
-        _audioPlayer.Resume();
-        UpdateState(AppProcessingState.Playing, $"Playing part {_currentIndex + 1}/{_chunks.Count}", _currentIndex, _chunks.Count);
+        if (_currentState != AppProcessingState.Paused)
+            return;
+
+        _isPaused = false;
+
+        if (_isNativeTtsActive)
+        {
+            if (_cts == null || _cts.IsCancellationRequested)
+            {
+                _cts = new CancellationTokenSource();
+            }
+
+            if (_currentNativeSentences.Count > 0 && _currentNativeSentenceIndex >= _currentNativeSentences.Count)
+            {
+                if (_settingsService.AutoPlay && _currentIndex + 1 < _chunks.Count)
+                {
+                    _ = PlayChunkAsync(_currentIndex + 1, _cts.Token);
+                }
+                else if (_currentIndex + 1 >= _chunks.Count)
+                {
+                    _isNativeTtsActive = false;
+                    _currentNativeSentences.Clear();
+                    _currentNativeSentenceIndex = 0;
+                    UpdateState(AppProcessingState.Idle, "Completed playback of all parts.");
+                }
+                else
+                {
+                    UpdateState(AppProcessingState.Paused, $"Finished part {_currentIndex + 1}/{_chunks.Count}", _currentIndex, _chunks.Count);
+                }
+            }
+            else
+            {
+                string text = (_currentIndex >= 0 && _currentIndex < _chunks.Count) ? _chunks[_currentIndex] : string.Empty;
+                if (!string.IsNullOrWhiteSpace(text))
+                {
+                    _ = PlayChunkWithNativeTtsAsync(_currentIndex, text, _cts.Token, _currentNativeSentenceIndex);
+                }
+            }
+        }
+        else
+        {
+            _audioPlayer.Resume();
+            UpdateState(AppProcessingState.Playing, $"Playing part {_currentIndex + 1}/{_chunks.Count}", _currentIndex, _chunks.Count);
+        }
     }
 
     public void Stop()
     {
+        _isPaused = false;
+        _isNativeTtsActive = false;
+        _currentNativeSentences.Clear();
+        _currentNativeSentenceIndex = 0;
+
         _cts?.Cancel();
         _cts?.Dispose();
         _cts = null;
@@ -266,6 +399,12 @@ public class AudioPlaybackManager : IAudioPlaybackManager
     {
         if (_currentIndex + 1 < _chunks.Count)
         {
+            _isNativeTtsActive = false;
+            _isPaused = false;
+            _currentNativeSentences.Clear();
+            _currentNativeSentenceIndex = 0;
+            _nativeTtsService.Stop();
+            _audioPlayer.Stop();
             await PlayChunkAsync(_currentIndex + 1, _cts?.Token ?? CancellationToken.None);
         }
     }
@@ -274,6 +413,12 @@ public class AudioPlaybackManager : IAudioPlaybackManager
     {
         if (_currentIndex - 1 >= 0)
         {
+            _isNativeTtsActive = false;
+            _isPaused = false;
+            _currentNativeSentences.Clear();
+            _currentNativeSentenceIndex = 0;
+            _nativeTtsService.Stop();
+            _audioPlayer.Stop();
             await PlayChunkAsync(_currentIndex - 1, _cts?.Token ?? CancellationToken.None);
         }
     }
