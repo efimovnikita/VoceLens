@@ -33,6 +33,7 @@ public static class MauiProgram
 		builder.Services.AddSingleton<IAppSettingsService, AppSettingsService>();
 		builder.Services.AddSingleton<IMistralClient, MistralClient>();
 		builder.Services.AddSingleton<ITextChunker, TextChunker>();
+		builder.Services.AddSingleton<INativeTtsService, NativeTtsService>();
 
 #if ANDROID
 		builder.Services.AddSingleton<IPlatformAudioPlayer, AndroidAudioPlayer>();

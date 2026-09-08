@@ -18,6 +18,11 @@ public class AppSettingsService : IAppSettingsService
     private const string KeyCropMarginLeft = "crop_margin_left";
     private const string KeyCropMarginRight = "crop_margin_right";
     private const string KeyCachedVoices = "mistral_cached_voices";
+    private const string KeyEnableAndroidTtsFallback = "enable_android_tts_fallback";
+    private const string KeyFallbackLanguageCode = "fallback_language_code";
+    private const string KeyFallbackLanguageName = "fallback_language_name";
+    private const string KeyFallbackVoiceId = "fallback_voice_id";
+    private const string KeyFallbackVoiceName = "fallback_voice_name";
 
     public string MistralApiKey { get; set; } = string.Empty;
     public string SelectedVoiceId { get; set; } = string.Empty;
@@ -29,6 +34,11 @@ public class AppSettingsService : IAppSettingsService
     public bool IsCropFrameEnabled { get; set; } = true;
     public CropFrameBounds CropFrame { get; set; } = new(8, 8, 0, 0, true);
     public List<VoiceItem> CachedVoices { get; set; } = new();
+    public bool EnableAndroidTtsFallback { get; set; } = true;
+    public string FallbackLanguageCode { get; set; } = string.Empty;
+    public string FallbackLanguageName { get; set; } = "Default (System Language)";
+    public string FallbackVoiceId { get; set; } = string.Empty;
+    public string FallbackVoiceName { get; set; } = "Default Voice";
 
     public AppSettingsService()
     {
@@ -49,6 +59,11 @@ public class AppSettingsService : IAppSettingsService
         }
         AutoPlay = Preferences.Default.Get(KeyAutoPlay, true);
         IsCropFrameEnabled = Preferences.Default.Get(KeyCropFrameEnabled, true);
+        EnableAndroidTtsFallback = Preferences.Default.Get(KeyEnableAndroidTtsFallback, true);
+        FallbackLanguageCode = Preferences.Default.Get(KeyFallbackLanguageCode, string.Empty);
+        FallbackLanguageName = Preferences.Default.Get(KeyFallbackLanguageName, "Default (System Language)");
+        FallbackVoiceId = Preferences.Default.Get(KeyFallbackVoiceId, string.Empty);
+        FallbackVoiceName = Preferences.Default.Get(KeyFallbackVoiceName, "Default Voice");
 
         int top = Preferences.Default.Get(KeyCropMarginTop, 8);
         int bottom = Preferences.Default.Get(KeyCropMarginBottom, 8);
@@ -80,6 +95,11 @@ public class AppSettingsService : IAppSettingsService
         Preferences.Default.Set(KeyMaxChunkLength, MaxChunkLength);
         Preferences.Default.Set(KeyAutoPlay, AutoPlay);
         Preferences.Default.Set(KeyCropFrameEnabled, IsCropFrameEnabled);
+        Preferences.Default.Set(KeyEnableAndroidTtsFallback, EnableAndroidTtsFallback);
+        Preferences.Default.Set(KeyFallbackLanguageCode, FallbackLanguageCode);
+        Preferences.Default.Set(KeyFallbackLanguageName, FallbackLanguageName);
+        Preferences.Default.Set(KeyFallbackVoiceId, FallbackVoiceId);
+        Preferences.Default.Set(KeyFallbackVoiceName, FallbackVoiceName);
 
         if (CropFrame != null)
         {

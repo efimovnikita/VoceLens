@@ -319,6 +319,56 @@
                         <Switch Grid.Column="1" IsToggled="{Binding AutoPlay}" OnColor="#4F46E5" ThumbColor="White" />
                     </Grid>
 
+                    <!-- Android TTS Fallback Separator -->
+                    <BoxView HeightRequest="1" Color="#334155" Margin="0,4" />
+
+                    <!-- Android TTS Fallback Switch -->
+                    <Grid ColumnDefinitions="*,Auto" VerticalOptions="Center">
+                        <VerticalStackLayout Grid.Column="0" Spacing="2">
+                            <Label Text="Enable Android TTS Fallback" FontSize="13" FontAttributes="Bold" TextColor="#E2E8F0" />
+                            <Label Text="Use local device voice if Mistral fails or censors text" FontSize="11" TextColor="#64748B" />
+                        </VerticalStackLayout>
+                        <Switch Grid.Column="1" IsToggled="{Binding EnableAndroidTtsFallback}" OnColor="#4F46E5" ThumbColor="White" />
+                    </Grid>
+
+                    <!-- Fallback Language and Voice Pickers -->
+                    <VerticalStackLayout Spacing="10" IsVisible="{Binding EnableAndroidTtsFallback}">
+                        <VerticalStackLayout Spacing="6">
+                            <Label Text="Fallback Language" FontSize="12" TextColor="#94A3B8" />
+                            <Border StrokeThickness="1" Stroke="#475569" StrokeShape="RoundRectangle 10" BackgroundColor="#0F172A" Padding="12,4">
+                                <Picker ItemsSource="{Binding FallbackLanguages}"
+                                        ItemDisplayBinding="{Binding DisplayName}"
+                                        SelectedItem="{Binding SelectedFallbackLanguage}"
+                                        Title="Select language"
+                                        TitleColor="#64748B"
+                                        TextColor="White"
+                                        FontSize="13" />
+                            </Border>
+                        </VerticalStackLayout>
+
+                        <VerticalStackLayout Spacing="6">
+                            <Label Text="Fallback Voice" FontSize="12" TextColor="#94A3B8" />
+                            <Border StrokeThickness="1" Stroke="#475569" StrokeShape="RoundRectangle 10" BackgroundColor="#0F172A" Padding="12,4">
+                                <Picker ItemsSource="{Binding FallbackVoices}"
+                                        ItemDisplayBinding="{Binding DisplayName}"
+                                        SelectedItem="{Binding SelectedFallbackVoice}"
+                                        Title="Select voice (or default)"
+                                        TitleColor="#64748B"
+                                        TextColor="White"
+                                        FontSize="13" />
+                            </Border>
+                        </VerticalStackLayout>
+
+                        <Button Text="{Binding TestFallbackTtsButtonText}"
+                                Command="{Binding TestFallbackTtsCommand}"
+                                BackgroundColor="#334155"
+                                TextColor="#F8FAFC"
+                                FontSize="12"
+                                FontAttributes="Bold"
+                                HeightRequest="42"
+                                CornerRadius="10" />
+                    </VerticalStackLayout>
+
                 </VerticalStackLayout>
             </Border>
 

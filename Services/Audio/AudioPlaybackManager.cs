@@ -14,6 +14,7 @@ public class AudioPlaybackManager : IAudioPlaybackManager
     private readonly IAppSettingsService _settingsService;
     private readonly ITextChunker _textChunker;
     private readonly IPlatformAudioPlayer _audioPlayer;
+    private readonly INativeTtsService _nativeTtsService;
 
     private readonly List<string> _chunks = new();
     private readonly Dictionary<int, string> _cachedAudioFiles = new();
@@ -31,12 +32,14 @@ public class AudioPlaybackManager : IAudioPlaybackManager
         IMistralClient mistralClient,
         IAppSettingsService settingsService,
         ITextChunker textChunker,
-        IPlatformAudioPlayer audioPlayer)
+        IPlatformAudioPlayer audioPlayer,
+        INativeTtsService nativeTtsService)
     {
         _mistralClient = mistralClient;
         _settingsService = settingsService;
         _textChunker = textChunker;
         _audioPlayer = audioPlayer;
+        _nativeTtsService = nativeTtsService;
 
         _audioPlayer.PlaybackEnded += OnPlaybackEnded;
     }
@@ -125,8 +128,60 @@ public class AudioPlaybackManager : IAudioPlaybackManager
         }
         catch (Exception ex)
         {
-            AppLog.Error($"TTS playback error on part {_currentIndex + 1}: {ex.Message}", ex, "MistralTTS");
-            UpdateState(AppProcessingState.Error, $"TTS Error: {ex.Message}", _currentIndex, _chunks.Count);
+            if (_settingsService.EnableAndroidTtsFallback)
+            {
+                AppLog.Warn($"Mistral TTS refused or failed on part {_currentIndex + 1}: {ex.Message}. Falling back to Android Native TTS...", "TTS");
+                await PlayChunkWithNativeTtsAsync(_currentIndex, text, cancellationToken);
+            }
+            else
+            {
+                AppLog.Error($"TTS playback error on part {_currentIndex + 1}: {ex.Message}", ex, "MistralTTS");
+                UpdateState(AppProcessingState.Error, $"TTS Error: {ex.Message}", _currentIndex, _chunks.Count);
+            }
+        }
+    }
+
+    private async Task PlayChunkWithNativeTtsAsync(int index, string text, CancellationToken cancellationToken)
+    {
+        try
+        {
+            UpdateState(AppProcessingState.Playing, $"Playing part {index + 1}/{_chunks.Count} (Android TTS Fallback)", index, _chunks.Count);
+            AppLog.Info($"Speaking part {index + 1}/{_chunks.Count} using Android Native TTS fallback ({text.Length} chars)...", "NativeTTS");
+
+            // Also attempt to preload next chunk with Mistral in background
+            _ = PreloadNextChunkAsync(index + 1);
+
+            string voiceOrLocale = !string.IsNullOrWhiteSpace(_settingsService.FallbackVoiceId)
+                ? _settingsService.FallbackVoiceId
+                : _settingsService.FallbackLanguageCode;
+
+            await _nativeTtsService.SpeakAsync(text, voiceOrLocale, cancellationToken);
+
+            if (!cancellationToken.IsCancellationRequested && _settingsService.AutoPlay)
+            {
+                if (index + 1 < _chunks.Count)
+                {
+                    await PlayChunkAsync(index + 1, cancellationToken);
+                }
+                else
+                {
+                    UpdateState(AppProcessingState.Idle, "Completed playback of all parts.");
+                }
+            }
+            else if (!cancellationToken.IsCancellationRequested)
+            {
+                UpdateState(AppProcessingState.Paused, $"Finished part {index + 1}/{_chunks.Count}", index, _chunks.Count);
+            }
+        }
+        catch (OperationCanceledException)
+        {
+            AppLog.Info("Native TTS playback canceled.", "Audio");
+            UpdateState(AppProcessingState.Idle, "Playback canceled.");
+        }
+        catch (Exception ex)
+        {
+            AppLog.Error($"Native TTS playback failed on part {index + 1}: {ex.Message}", ex, "NativeTTS");
+            UpdateState(AppProcessingState.Error, $"Native TTS Error: {ex.Message}", index, _chunks.Count);
         }
     }
 
@@ -183,6 +238,7 @@ public class AudioPlaybackManager : IAudioPlaybackManager
     public void Pause()
     {
         _audioPlayer.Pause();
+        _nativeTtsService.Stop();
         UpdateState(AppProcessingState.Paused, $"Paused at part {_currentIndex + 1}/{_chunks.Count}", _currentIndex, _chunks.Count);
     }
 
@@ -199,6 +255,7 @@ public class AudioPlaybackManager : IAudioPlaybackManager
         _cts = null;
 
         _audioPlayer.Stop();
+        _nativeTtsService.Stop();
         _chunks.Clear();
         _cachedAudioFiles.Clear();
         _currentIndex = 0;

@@ -23,9 +23,13 @@ public class MainViewModel : INotifyPropertyChanged
     private readonly IAudioPlaybackManager _playbackManager;
     private readonly IOcrSpeechWorkflowController _workflow;
     private readonly IAppLogService _logService;
+    private readonly INativeTtsService _nativeTtsService;
 
     private string _apiKey = string.Empty;
     private VoiceItem? _selectedVoice;
+    private NativeTtsLanguage? _selectedFallbackLanguage;
+    private NativeTtsVoice? _selectedFallbackVoice;
+    private bool _isTestingFallbackTts;
     private string _statusMessage = "Ready";
     private string _extractedText = string.Empty;
     private bool _isBusy;
@@ -37,6 +41,8 @@ public class MainViewModel : INotifyPropertyChanged
     public event PropertyChangedEventHandler? PropertyChanged;
 
     public ObservableCollection<VoiceItem> Voices { get; } = new();
+    public ObservableCollection<NativeTtsLanguage> FallbackLanguages { get; } = new();
+    public ObservableCollection<NativeTtsVoice> FallbackVoices { get; } = new();
 
     public string ApiKey
     {
@@ -115,6 +121,72 @@ public class MainViewModel : INotifyPropertyChanged
             OnPropertyChanged();
         }
     }
+
+    public bool EnableAndroidTtsFallback
+    {
+        get => _settings.EnableAndroidTtsFallback;
+        set
+        {
+            if (_settings.EnableAndroidTtsFallback != value)
+            {
+                _settings.EnableAndroidTtsFallback = value;
+                _settings.Save();
+                OnPropertyChanged();
+            }
+        }
+    }
+
+    public NativeTtsLanguage? SelectedFallbackLanguage
+    {
+        get => _selectedFallbackLanguage;
+        set
+        {
+            if (_selectedFallbackLanguage != value)
+            {
+                _selectedFallbackLanguage = value;
+                if (value != null)
+                {
+                    _settings.FallbackLanguageCode = value.Code;
+                    _settings.FallbackLanguageName = value.DisplayName;
+                    _settings.Save();
+                    _ = LoadFallbackVoicesForLanguageAsync(value.Code);
+                }
+                OnPropertyChanged();
+            }
+        }
+    }
+
+    public NativeTtsVoice? SelectedFallbackVoice
+    {
+        get => _selectedFallbackVoice;
+        set
+        {
+            if (_selectedFallbackVoice != value)
+            {
+                _selectedFallbackVoice = value;
+                if (value != null)
+                {
+                    _settings.FallbackVoiceId = value.Id;
+                    _settings.FallbackVoiceName = value.DisplayName;
+                    _settings.Save();
+                }
+                OnPropertyChanged();
+            }
+        }
+    }
+
+    public bool IsTestingFallbackTts
+    {
+        get => _isTestingFallbackTts;
+        set
+        {
+            _isTestingFallbackTts = value;
+            OnPropertyChanged();
+            OnPropertyChanged(nameof(TestFallbackTtsButtonText));
+        }
+    }
+
+    public string TestFallbackTtsButtonText => IsTestingFallbackTts ? "🔊 Speaking..." : "🔊 Test Android Fallback Speech";
 
     public string StatusMessage
     {
@@ -346,6 +418,7 @@ public class MainViewModel : INotifyPropertyChanged
     public ICommand LoadLastScreenshotCalibrationCommand { get; }
     public ICommand CopyLogsCommand { get; }
     public ICommand ClearLogsCommand { get; }
+    public ICommand TestFallbackTtsCommand { get; }
 
     public string FormattedLogs => _logService.GetFormattedLogText(newestFirst: true);
     public string LogCountText => $"({_logService.GetEntries().Count}/500)";
@@ -356,7 +429,8 @@ public class MainViewModel : INotifyPropertyChanged
         IFloatingOverlayService overlayService,
         IAudioPlaybackManager playbackManager,
         IOcrSpeechWorkflowController workflow,
-        IAppLogService logService)
+        IAppLogService logService,
+        INativeTtsService nativeTtsService)
     {
         _settings = settings;
         _mistralClient = mistralClient;
@@ -364,6 +438,7 @@ public class MainViewModel : INotifyPropertyChanged
         _playbackManager = playbackManager;
         _workflow = workflow;
         _logService = logService;
+        _nativeTtsService = nativeTtsService;
 
         _apiKey = _settings.MistralApiKey;
 
@@ -382,6 +457,7 @@ public class MainViewModel : INotifyPropertyChanged
         LoadLastScreenshotCalibrationCommand = new Command(LoadLastScreenshotCalibration);
         CopyLogsCommand = new Command(async () => await CopyLogsAsync());
         ClearLogsCommand = new Command(ClearLogs);
+        TestFallbackTtsCommand = new Command(async () => await TestFallbackTtsAsync());
 
         _logService.LogsChanged += (s, e) =>
         {
@@ -415,6 +491,7 @@ public class MainViewModel : INotifyPropertyChanged
 
         RefreshPermissionsAndState();
         LoadCachedVoices();
+        _ = LoadFallbackTtsSettingsAsync();
     }
 
     public void RefreshPermissionsAndState()
@@ -656,6 +733,122 @@ public class MainViewModel : INotifyPropertyChanged
         _logService.Clear();
         StatusMessage = "🗑️ Application log cleared.";
         AppLog.Info("Log buffer cleared by user.", "UI");
+    }
+
+    private async Task LoadFallbackTtsSettingsAsync()
+    {
+        try
+        {
+            var languages = await _nativeTtsService.GetAvailableLanguagesAsync();
+            MainThread.BeginInvokeOnMainThread(async () =>
+            {
+                FallbackLanguages.Clear();
+                foreach (var lang in languages)
+                {
+                    FallbackLanguages.Add(lang);
+                }
+
+                var savedLang = FallbackLanguages.FirstOrDefault(l => l.Code == _settings.FallbackLanguageCode)
+                    ?? FallbackLanguages.FirstOrDefault();
+
+                _selectedFallbackLanguage = savedLang;
+                OnPropertyChanged(nameof(SelectedFallbackLanguage));
+
+                await LoadFallbackVoicesForLanguageAsync(savedLang?.Code);
+            });
+        }
+        catch (Exception ex)
+        {
+            AppLog.Warn($"Failed to load fallback TTS languages: {ex.Message}", "NativeTTS");
+        }
+    }
+
+    private async Task LoadFallbackVoicesForLanguageAsync(string? languageCode)
+    {
+        try
+        {
+            var voices = await _nativeTtsService.GetAvailableVoicesAsync(languageCode);
+            MainThread.BeginInvokeOnMainThread(() =>
+            {
+                FallbackVoices.Clear();
+                foreach (var v in voices)
+                {
+                    FallbackVoices.Add(v);
+                }
+
+                var savedVoice = FallbackVoices.FirstOrDefault(v => v.Id == _settings.FallbackVoiceId)
+                    ?? FallbackVoices.FirstOrDefault();
+
+                _selectedFallbackVoice = savedVoice;
+                OnPropertyChanged(nameof(SelectedFallbackVoice));
+            });
+        }
+        catch (Exception ex)
+        {
+            AppLog.Warn($"Failed to load fallback TTS voices: {ex.Message}", "NativeTTS");
+        }
+    }
+
+    private async Task TestFallbackTtsAsync()
+    {
+        if (IsTestingFallbackTts)
+        {
+            _nativeTtsService.Stop();
+            IsTestingFallbackTts = false;
+            return;
+        }
+
+        try
+        {
+            IsTestingFallbackTts = true;
+            string testPhrase;
+            string lang = _settings.FallbackLanguageCode?.ToLowerInvariant() ?? "";
+
+            if (lang.StartsWith("it"))
+            {
+                testPhrase = "VoceLens: Test del sintetizzatore vocale Android completato con successo.";
+            }
+            else if (lang.StartsWith("ru"))
+            {
+                testPhrase = "VoceLens: Проверка синтезатора речи Android выполнена успешно.";
+            }
+            else if (lang.StartsWith("en"))
+            {
+                testPhrase = "VoceLens: Android Text-to-Speech test completed successfully.";
+            }
+            else if (lang.StartsWith("es"))
+            {
+                testPhrase = "VoceLens: Prueba del sintetizador de voz de Android completada con éxito.";
+            }
+            else if (lang.StartsWith("fr"))
+            {
+                testPhrase = "VoceLens: Test de synthèse vocale Android réussi.";
+            }
+            else if (lang.StartsWith("de"))
+            {
+                testPhrase = "VoceLens: Android-Sprachausgabetest erfolgreich abgeschlossen.";
+            }
+            else
+            {
+                testPhrase = "VoceLens: Проверка синтезатора речи Android выполнена успешно.";
+            }
+
+            string voiceOrLocale = !string.IsNullOrWhiteSpace(_settings.FallbackVoiceId)
+                ? _settings.FallbackVoiceId
+                : _settings.FallbackLanguageCode;
+
+            AppLog.Info($"Testing Android Native TTS: '{testPhrase}' (Voice/Locale: {voiceOrLocale})", "NativeTTS");
+            await _nativeTtsService.SpeakAsync(testPhrase, voiceOrLocale);
+        }
+        catch (Exception ex)
+        {
+            AppLog.Error($"Test Fallback TTS error: {ex.Message}", ex, "NativeTTS");
+            StatusMessage = $"❌ Native TTS Test Error: {ex.Message}";
+        }
+        finally
+        {
+            IsTestingFallbackTts = false;
+        }
     }
 
     protected void OnPropertyChanged([CallerMemberName] string? propertyName = null)

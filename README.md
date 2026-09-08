@@ -54,7 +54,16 @@ The app captures the screen, transmits it to **Mistral OCR** for high-precision 
 - **Intelligent Chunking (`splitIntoChunks`)**:
   - Preserves grammatical sentence boundaries (`.`, `!`, `?`) and enforces character limits without cutting words in half.
 
-### 5. 📋 Real-Time Event Log & Transcript Display
+### 5. 🤖 Native Android TTS Fallback (Censorship & Failure Resilience)
+- **Zero Content Moderation**: Built-in protection for reading literature containing mature, romantic, or erotic scenes where cloud models (like Mistral) enforce content moderation refusals.
+- **Graceful Failover**: If Mistral TTS rejects a text chunk or encounters an error, VoceLens seamlessly routes that chunk to Android's local Text-to-Speech synthesizer and auto-advances to subsequent chunks without interrupting reading.
+- **Customizable Fallback Settings**:
+  - Master toggle (`Enable Android TTS Fallback`, enabled by default).
+  - Language selection (defaults to device system language, with all installed Android locales available).
+  - Voice selection (dynamically enumerates all local and network voices installed on the device).
+  - Audio testing button (`🔊 Test Android Fallback Speech`) with live playback control.
+
+### 6. 📋 Real-Time Event Log & Transcript Display
 - **LAST EXTRACTED OCR TEXT**: displays the latest recognized and sanitized text directly on the dashboard.
 - **APPLICATION LOG**: embedded scrollable terminal showing the last 500 diagnostic events with level-based color coding (`INFO`, `WARN`, `ERROR`):
   - **«📋 Copy»** — copies complete event history to the clipboard.
@@ -91,7 +100,9 @@ VoceLens/
 │   ├── Audio/
 │   │   ├── AudioPlaybackManager.cs # Playback queue, MP3 cache & chunk preloader
 │   │   ├── IAudioPlaybackManager.cs
-│   │   └── IPlatformAudioPlayer.cs
+│   │   ├── INativeTtsService.cs    # Local Android Text-to-Speech contract
+│   │   ├── IPlatformAudioPlayer.cs
+│   │   └── NativeTtsService.cs     # Native Android TTS fallback engine with locale/voice selection
 │   ├── Chunking/
 │   │   ├── ITextChunker.cs
 │   │   ├── TextChunker.cs          # splitIntoChunks sentence boundary splitter

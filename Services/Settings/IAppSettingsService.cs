@@ -14,6 +14,11 @@ public interface IAppSettingsService
     bool IsCropFrameEnabled { get; set; }
     CropFrameBounds CropFrame { get; set; }
     List<VoiceItem> CachedVoices { get; set; }
+    bool EnableAndroidTtsFallback { get; set; }
+    string FallbackLanguageCode { get; set; }
+    string FallbackLanguageName { get; set; }
+    string FallbackVoiceId { get; set; }
+    string FallbackVoiceName { get; set; }
 
     void Save();
     void Load();
