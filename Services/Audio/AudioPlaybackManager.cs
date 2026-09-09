@@ -186,19 +186,16 @@ public class AudioPlaybackManager : IAudioPlaybackManager
                 ? _settingsService.FallbackVoiceId
                 : _settingsService.FallbackLanguageCode;
 
-            for (int i = _currentNativeSentenceIndex; i < _currentNativeSentences.Count; i++)
-            {
-                if (_isPaused || cancellationToken.IsCancellationRequested)
-                    break;
-
-                _currentNativeSentenceIndex = i;
-                string sentence = _currentNativeSentences[i];
-                if (string.IsNullOrWhiteSpace(sentence))
-                    continue;
-
-                await _nativeTtsService.SpeakAsync(sentence, voiceOrLocale, cancellationToken);
-                _currentNativeSentenceIndex = i + 1;
-            }
+            await _nativeTtsService.SpeakSentencesAsync(
+                _currentNativeSentences,
+                _currentNativeSentenceIndex,
+                voiceOrLocale,
+                sentenceIdx =>
+                {
+                    _currentNativeSentenceIndex = sentenceIdx;
+                    AppLog.Info($"Speaking sentence {sentenceIdx + 1}/{_currentNativeSentences.Count} (part {index + 1}/{_chunks.Count})", "NativeTTS");
+                },
+                cancellationToken);
 
             if (_isPaused)
             {

@@ -24,5 +24,11 @@ public interface INativeTtsService
     Task<IReadOnlyList<NativeTtsLanguage>> GetAvailableLanguagesAsync();
     Task<IReadOnlyList<NativeTtsVoice>> GetAvailableVoicesAsync(string? languageCode = null);
     Task SpeakAsync(string text, string? voiceIdOrLocale = null, CancellationToken cancellationToken = default);
+    Task SpeakSentencesAsync(
+        IReadOnlyList<string> sentences,
+        int startSentenceIndex,
+        string? voiceIdOrLocale,
+        Action<int> onSentenceStarted,
+        CancellationToken cancellationToken);
     void Stop();
 }
