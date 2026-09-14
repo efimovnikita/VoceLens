@@ -42,6 +42,9 @@ public class OcrSpeechWorkflowController : IOcrSpeechWorkflowController
             _currentStatusMessage = e.Message;
             StatusChanged?.Invoke(this, e);
         };
+
+        // Pre-warm TCP/TLS connection to Mistral in background
+        _ = _mistralClient.PrewarmConnectionAsync();
     }
 
     public async Task ProcessScreenCaptureAndReadAsync(CancellationToken cancellationToken = default)

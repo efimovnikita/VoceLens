@@ -37,20 +37,20 @@ public class TextChunker : ITextChunker
         var chunks = new List<string>();
         int sentenceIndex = 0;
 
-        // 1. Turbo Start: create a fast, compact initial chunk (~150-250 chars) from the first 1-2 sentences
-        const int TurboStartMinLength = 120;
-        const int TurboStartMaxLength = 250;
+        // 1. Turbo Start: create an ultra-fast initial chunk (strictly first sentence, ~30-80 chars) for instant audio start
+        const int TurboTargetMaxLength = 80;
+        const int TurboMinLength = 30;
 
-        if (enableTurboStart && sentences.Count > 1 && text.Length > TurboStartMaxLength)
+        if (enableTurboStart && sentences.Count > 1)
         {
             string firstChunk = sentences[0];
             sentenceIndex = 1;
 
-            // If the first sentence is shorter than TurboStartMinLength, try appending subsequent sentences up to TurboStartMaxLength
-            while (sentenceIndex < sentences.Count)
+            // If the first sentence is very short (< 30 chars), append the next sentence up to ~80 chars
+            while (sentenceIndex < sentences.Count && firstChunk.Length < TurboMinLength)
             {
                 string nextSentence = sentences[sentenceIndex];
-                if (firstChunk.Length + 1 + nextSentence.Length <= TurboStartMaxLength)
+                if (firstChunk.Length + 1 + nextSentence.Length <= TurboTargetMaxLength)
                 {
                     firstChunk = $"{firstChunk} {nextSentence}";
                     sentenceIndex++;
@@ -68,6 +68,31 @@ public class TextChunker : ITextChunker
             else
             {
                 chunks.Add(firstChunk.Trim());
+            }
+        }
+        else if (enableTurboStart && sentences.Count == 1 && sentences[0].Length > 120)
+        {
+            // If there is only one long sentence without periods, split at the first clause mark (comma, semicolon, dash, colon, newline)
+            // so playback can start immediately in ~200ms
+            string singleSentence = sentences[0];
+            int clauseBreak = -1;
+            char[] clauseDelimiters = { ',', ';', ':', '—', '-', '\n' };
+            for (int ci = 35; ci < Math.Min(singleSentence.Length, 100); ci++)
+            {
+                if (clauseDelimiters.Contains(singleSentence[ci]))
+                {
+                    clauseBreak = ci + 1;
+                    break;
+                }
+            }
+
+            if (clauseBreak > 0)
+            {
+                string firstClause = singleSentence.Substring(0, clauseBreak).Trim();
+                string remainingClause = singleSentence.Substring(clauseBreak).Trim();
+                chunks.Add(firstClause);
+                sentences[0] = remainingClause;
+                sentenceIndex = 0;
             }
         }
 

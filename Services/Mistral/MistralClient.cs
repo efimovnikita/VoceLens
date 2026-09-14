@@ -207,4 +207,21 @@ public class MistralClient : IMistralClient
 
         throw new HttpRequestException($"Mistral API Error (HTTP {(int)statusCode}): {content}");
     }
+
+    /// <summary>
+    /// Pre-warms the HTTP TCP/TLS connection pool to api.mistral.ai so the first user scan doesn't suffer connection handshake delay.
+    /// </summary>
+    public async Task PrewarmConnectionAsync()
+    {
+        try
+        {
+            using var pingRequest = new HttpRequestMessage(HttpMethod.Head, $"{BaseApiUrl}/models");
+            using var cts = new CancellationTokenSource(2500);
+            await _httpClient.SendAsync(pingRequest, HttpCompletionOption.ResponseHeadersRead, cts.Token);
+        }
+        catch
+        {
+            // Best effort pre-warming; silently ignore any network/auth failures
+        }
+    }
 }
