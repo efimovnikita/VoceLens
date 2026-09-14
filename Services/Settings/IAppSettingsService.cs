@@ -15,6 +15,7 @@ public interface IAppSettingsService
     CropFrameBounds CropFrame { get; set; }
     List<VoiceItem> CachedVoices { get; set; }
     bool EnableAndroidTtsFallback { get; set; }
+    bool EnableTurboStart { get; set; }
     string FallbackLanguageCode { get; set; }
     string FallbackLanguageName { get; set; }
     string FallbackVoiceId { get; set; }

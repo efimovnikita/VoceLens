@@ -19,6 +19,7 @@ public class AudioPlaybackManager : IAudioPlaybackManager
 
     private readonly List<string> _chunks = new();
     private readonly Dictionary<int, string> _cachedAudioFiles = new();
+    private readonly HashSet<int> _preloadingIndices = new();
     private int _currentIndex = -1;
     private AppProcessingState _currentState = AppProcessingState.Idle;
     private CancellationTokenSource? _cts;
@@ -67,9 +68,9 @@ public class AudioPlaybackManager : IAudioPlaybackManager
         }
 
         UpdateState(AppProcessingState.TextChunking, "Splitting text into chunks...");
-        var split = _textChunker.SplitIntoChunks(fullText, _settingsService.MaxChunkLength);
+        var split = _textChunker.SplitIntoChunks(fullText, _settingsService.MaxChunkLength, _settingsService.EnableTurboStart);
         _chunks.AddRange(split);
-        AppLog.Info($"Text split into {_chunks.Count} chunks (total {fullText.Length} chars, max: {_settingsService.MaxChunkLength})", "TTS");
+        AppLog.Info($"Text split into {_chunks.Count} chunks (total {fullText.Length} chars, max: {_settingsService.MaxChunkLength}, TurboStart: {_settingsService.EnableTurboStart})", "TTS");
 
         if (_chunks.Count == 0)
         {
@@ -79,6 +80,14 @@ public class AudioPlaybackManager : IAudioPlaybackManager
         }
 
         _cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+
+        // Turbo Start: immediately preload chunk 1 in parallel while chunk 0 is generating
+        if (_settingsService.EnableTurboStart && _chunks.Count > 1)
+        {
+            AppLog.Info("🚀 Turbo Start: Immediately preloading chunk 2 in parallel while starting chunk 1...", "TTS");
+            _ = PreloadNextChunkAsync(1);
+        }
+
         await PlayChunkAsync(0, _cts.Token);
     }
 
@@ -104,7 +113,7 @@ public class AudioPlaybackManager : IAudioPlaybackManager
 
         try
         {
-            string? audioFilePath;
+            string? audioFilePath = null;
 
             if (_cachedAudioFiles.TryGetValue(_currentIndex, out var existingPath) && File.Exists(existingPath))
             {
@@ -113,19 +122,42 @@ public class AudioPlaybackManager : IAudioPlaybackManager
             }
             else
             {
-                UpdateState(AppProcessingState.GeneratingAudio, $"Generating speech for part {_currentIndex + 1}/{_chunks.Count}...", _currentIndex, _chunks.Count);
-                AppLog.Info($"Requesting Mistral TTS for chunk {_currentIndex + 1}/{_chunks.Count} ({text.Length} chars, voice: {_settingsService.SelectedVoiceName ?? _settingsService.SelectedVoiceId})...", "MistralTTS");
+                // If chunk is currently being preloaded in background, wait briefly (up to 3.5s) for it to complete
+                int attempts = 0;
+                while (IsPreloading(_currentIndex) && attempts < 35)
+                {
+                    if (cancellationToken.IsCancellationRequested || _isPaused)
+                        return;
 
-                byte[] audioBytes = await _mistralClient.GenerateSpeechAsync(
-                    _settingsService.MistralApiKey,
-                    text,
-                    _settingsService.SelectedVoiceId,
-                    _settingsService.TtsModel,
-                    cancellationToken);
+                    await Task.Delay(100, cancellationToken);
+                    attempts++;
+                    if (_cachedAudioFiles.TryGetValue(_currentIndex, out var readyPath) && File.Exists(readyPath))
+                    {
+                        audioFilePath = readyPath;
+                        break;
+                    }
+                }
 
-                audioFilePath = SaveAudioToCache(_currentIndex, audioBytes);
-                _cachedAudioFiles[_currentIndex] = audioFilePath;
-                AppLog.Info($"TTS audio generated ({audioBytes.Length / 1024} KB) for chunk {_currentIndex + 1}/{_chunks.Count}", "MistralTTS");
+                if (!string.IsNullOrEmpty(audioFilePath))
+                {
+                    AppLog.Info($"Preload completed just-in-time for chunk {_currentIndex + 1}/{_chunks.Count}!", "TTS");
+                }
+                else
+                {
+                    UpdateState(AppProcessingState.GeneratingAudio, $"Generating speech for part {_currentIndex + 1}/{_chunks.Count}...", _currentIndex, _chunks.Count);
+                    AppLog.Info($"Requesting Mistral TTS for chunk {_currentIndex + 1}/{_chunks.Count} ({text.Length} chars, voice: {_settingsService.SelectedVoiceName ?? _settingsService.SelectedVoiceId})...", "MistralTTS");
+
+                    byte[] audioBytes = await _mistralClient.GenerateSpeechAsync(
+                        _settingsService.MistralApiKey,
+                        text,
+                        _settingsService.SelectedVoiceId,
+                        _settingsService.TtsModel,
+                        cancellationToken);
+
+                    audioFilePath = SaveAudioToCache(_currentIndex, audioBytes);
+                    _cachedAudioFiles[_currentIndex] = audioFilePath;
+                    AppLog.Info($"TTS audio generated ({audioBytes.Length / 1024} KB) for chunk {_currentIndex + 1}/{_chunks.Count}", "MistralTTS");
+                }
             }
 
             // Preload next chunk in background if available
@@ -267,14 +299,31 @@ public class AudioPlaybackManager : IAudioPlaybackManager
         return list;
     }
 
+    private bool IsPreloading(int index)
+    {
+        lock (_preloadingIndices)
+        {
+            return _preloadingIndices.Contains(index);
+        }
+    }
+
     private async Task PreloadNextChunkAsync(int nextIndex)
     {
         if (nextIndex >= _chunks.Count || _cachedAudioFiles.ContainsKey(nextIndex))
             return;
 
+        lock (_preloadingIndices)
+        {
+            if (_preloadingIndices.Contains(nextIndex))
+                return;
+            _preloadingIndices.Add(nextIndex);
+        }
+
         try
         {
             string nextText = _chunks[nextIndex];
+            AppLog.Info($"Background preloading chunk {nextIndex + 1}/{_chunks.Count} ({nextText.Length} chars)...", "MistralTTS");
+
             byte[] audioBytes = await _mistralClient.GenerateSpeechAsync(
                 _settingsService.MistralApiKey,
                 nextText,
@@ -284,10 +333,18 @@ public class AudioPlaybackManager : IAudioPlaybackManager
 
             string path = SaveAudioToCache(nextIndex, audioBytes);
             _cachedAudioFiles[nextIndex] = path;
+            AppLog.Info($"Background preloaded chunk {nextIndex + 1}/{_chunks.Count} ({audioBytes.Length / 1024} KB)", "MistralTTS");
         }
-        catch
+        catch (Exception ex)
         {
-            // Background preloading error can be safely retried on demand
+            AppLog.Warn($"Background preload failed for chunk {nextIndex + 1}: {ex.Message}", "MistralTTS");
+        }
+        finally
+        {
+            lock (_preloadingIndices)
+            {
+                _preloadingIndices.Remove(nextIndex);
+            }
         }
     }
 
@@ -388,6 +445,10 @@ public class AudioPlaybackManager : IAudioPlaybackManager
         _nativeTtsService.Stop();
         _chunks.Clear();
         _cachedAudioFiles.Clear();
+        lock (_preloadingIndices)
+        {
+            _preloadingIndices.Clear();
+        }
         _currentIndex = 0;
         UpdateState(AppProcessingState.Idle, "Ready");
     }

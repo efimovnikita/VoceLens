@@ -122,6 +122,20 @@ public class MainViewModel : INotifyPropertyChanged
         }
     }
 
+    public bool EnableTurboStart
+    {
+        get => _settings.EnableTurboStart;
+        set
+        {
+            if (_settings.EnableTurboStart != value)
+            {
+                _settings.EnableTurboStart = value;
+                _settings.Save();
+                OnPropertyChanged();
+            }
+        }
+    }
+
     public bool EnableAndroidTtsFallback
     {
         get => _settings.EnableAndroidTtsFallback;

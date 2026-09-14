@@ -319,6 +319,15 @@
                         <Switch Grid.Column="1" IsToggled="{Binding AutoPlay}" OnColor="#4F46E5" ThumbColor="White" />
                     </Grid>
 
+                    <!-- Turbo Start (Fast Playback) -->
+                    <Grid ColumnDefinitions="*,Auto" VerticalOptions="Center">
+                        <VerticalStackLayout Grid.Column="0" Spacing="2">
+                            <Label Text="🚀 Turbo Start (Fast Playback)" FontSize="13" FontAttributes="Bold" TextColor="#E2E8F0" />
+                            <Label Text="Instant audio start with adaptive first sentence &amp; parallel preloading" FontSize="11" TextColor="#64748B" />
+                        </VerticalStackLayout>
+                        <Switch Grid.Column="1" IsToggled="{Binding EnableTurboStart}" OnColor="#4F46E5" ThumbColor="White" />
+                    </Grid>
+
                     <!-- Android TTS Fallback Separator -->
                     <BoxView HeightRequest="1" Color="#334155" Margin="0,4" />
 
