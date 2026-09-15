@@ -136,6 +136,20 @@ public class MainViewModel : INotifyPropertyChanged
         }
     }
 
+    public int TurboMinFirstChunkLength
+    {
+        get => _settings.TurboMinFirstChunkLength;
+        set
+        {
+            if (_settings.TurboMinFirstChunkLength != value)
+            {
+                _settings.TurboMinFirstChunkLength = value;
+                _settings.Save();
+                OnPropertyChanged();
+            }
+        }
+    }
+
     public bool EnableAndroidTtsFallback
     {
         get => _settings.EnableAndroidTtsFallback;

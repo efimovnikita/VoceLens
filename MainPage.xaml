@@ -328,6 +328,17 @@
                         <Switch Grid.Column="1" IsToggled="{Binding EnableTurboStart}" OnColor="#4F46E5" ThumbColor="White" />
                     </Grid>
 
+                    <!-- Turbo Start First Chunk Min Length -->
+                    <Grid ColumnDefinitions="*,Auto" VerticalOptions="Center" IsVisible="{Binding EnableTurboStart}">
+                        <VerticalStackLayout Grid.Column="0" Spacing="2">
+                            <Label Text="First Chunk Min Characters" FontSize="13" FontAttributes="Bold" TextColor="#E2E8F0" />
+                            <Label Text="Minimum characters for part 1 to avoid pauses on short sentences" FontSize="11" TextColor="#64748B" />
+                        </VerticalStackLayout>
+                        <Border Grid.Column="1" StrokeThickness="1" Stroke="#475569" StrokeShape="RoundRectangle 10" BackgroundColor="#0F172A" Padding="12,0" WidthRequest="90">
+                            <Entry Text="{Binding TurboMinFirstChunkLength}" Keyboard="Numeric" TextColor="White" FontSize="13" HeightRequest="40" HorizontalTextAlignment="Center" />
+                        </Border>
+                    </Grid>
+
                     <!-- Android TTS Fallback Separator -->
                     <BoxView HeightRequest="1" Color="#334155" Margin="0,4" />
 

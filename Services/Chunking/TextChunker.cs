@@ -4,7 +4,7 @@ namespace VoceLens.Services.Chunking;
 
 public interface ITextChunker
 {
-    List<string> SplitIntoChunks(string text, int maxChunkLength = 1000, bool enableTurboStart = false);
+    List<string> SplitIntoChunks(string text, int maxChunkLength = 1000, bool enableTurboStart = false, int minTurboChunkLength = 85);
 }
 
 /// <summary>
@@ -15,7 +15,7 @@ public class TextChunker : ITextChunker
 {
     private static readonly Regex SentenceRegex = new(@"[^.!?]+[.!?]*|[^.!?]+", RegexOptions.Compiled);
 
-    public List<string> SplitIntoChunks(string text, int maxChunkLength = 1000, bool enableTurboStart = false)
+    public List<string> SplitIntoChunks(string text, int maxChunkLength = 1000, bool enableTurboStart = false, int minTurboChunkLength = 85)
     {
         if (string.IsNullOrWhiteSpace(text))
             return new List<string>();
@@ -27,6 +27,9 @@ public class TextChunker : ITextChunker
         if (maxChunkLength <= 0)
             maxChunkLength = 1000;
 
+        if (minTurboChunkLength <= 0)
+            minTurboChunkLength = 85;
+
         var matches = SentenceRegex.Matches(text);
         var sentences = matches.Select(m => m.Value.Trim()).Where(s => !string.IsNullOrEmpty(s)).ToList();
         if (sentences.Count == 0)
@@ -37,25 +40,23 @@ public class TextChunker : ITextChunker
         var chunks = new List<string>();
         int sentenceIndex = 0;
 
-        // 1. Turbo Start: create an ultra-fast initial chunk (strictly first sentence, ~30-80 chars) for instant audio start
-        const int TurboTargetMaxLength = 80;
-        const int TurboMinLength = 30;
-
+        // 1. Turbo Start: create an initial chunk with a safe minimum character threshold.
+        // This ensures chunk 0 has sufficient spoken duration (~5-7 sec) for chunk 1 (1000 chars)
+        // to finish background preloading without any dead pause, even if the first sentence
+        // is just a single word (e.g. "Статья.") or a short tail from the previous page.
         if (enableTurboStart && sentences.Count > 1)
         {
             string firstChunk = sentences[0];
             sentenceIndex = 1;
 
-            // If the first sentence is very short (< 30 chars), append the next sentence up to ~80 chars
-            while (sentenceIndex < sentences.Count && firstChunk.Length < TurboMinLength)
+            // Keep appending sentences as long as firstChunk is shorter than minTurboChunkLength
+            while (sentenceIndex < sentences.Count && firstChunk.Length < minTurboChunkLength)
             {
                 string nextSentence = sentences[sentenceIndex];
-                if (firstChunk.Length + 1 + nextSentence.Length <= TurboTargetMaxLength)
-                {
-                    firstChunk = $"{firstChunk} {nextSentence}";
-                    sentenceIndex++;
-                }
-                else
+                firstChunk = $"{firstChunk} {nextSentence}";
+                sentenceIndex++;
+
+                if (firstChunk.Length >= minTurboChunkLength)
                 {
                     break;
                 }
@@ -73,11 +74,13 @@ public class TextChunker : ITextChunker
         else if (enableTurboStart && sentences.Count == 1 && sentences[0].Length > 120)
         {
             // If there is only one long sentence without periods, split at the first clause mark (comma, semicolon, dash, colon, newline)
-            // so playback can start immediately in ~200ms
+            // around minTurboChunkLength so playback can start immediately in ~300ms
             string singleSentence = sentences[0];
             int clauseBreak = -1;
             char[] clauseDelimiters = { ',', ';', ':', '—', '-', '\n' };
-            for (int ci = 35; ci < Math.Min(singleSentence.Length, 100); ci++)
+            int minSearch = Math.Min(35, minTurboChunkLength / 2);
+            int maxSearch = Math.Min(singleSentence.Length, Math.Max(minTurboChunkLength + 30, 100));
+            for (int ci = minSearch; ci < maxSearch; ci++)
             {
                 if (clauseDelimiters.Contains(singleSentence[ci]))
                 {

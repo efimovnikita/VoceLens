@@ -20,6 +20,7 @@ public class AppSettingsService : IAppSettingsService
     private const string KeyCachedVoices = "mistral_cached_voices";
     private const string KeyEnableAndroidTtsFallback = "enable_android_tts_fallback";
     private const string KeyEnableTurboStart = "enable_turbo_start";
+    private const string KeyTurboMinFirstChunkLength = "turbo_min_first_chunk_length";
     private const string KeyFallbackLanguageCode = "fallback_language_code";
     private const string KeyFallbackLanguageName = "fallback_language_name";
     private const string KeyFallbackVoiceId = "fallback_voice_id";
@@ -37,6 +38,7 @@ public class AppSettingsService : IAppSettingsService
     public List<VoiceItem> CachedVoices { get; set; } = new();
     public bool EnableAndroidTtsFallback { get; set; } = true;
     public bool EnableTurboStart { get; set; } = false;
+    public int TurboMinFirstChunkLength { get; set; } = 85;
     public string FallbackLanguageCode { get; set; } = string.Empty;
     public string FallbackLanguageName { get; set; } = "Default (System Language)";
     public string FallbackVoiceId { get; set; } = string.Empty;
@@ -63,6 +65,11 @@ public class AppSettingsService : IAppSettingsService
         IsCropFrameEnabled = Preferences.Default.Get(KeyCropFrameEnabled, true);
         EnableAndroidTtsFallback = Preferences.Default.Get(KeyEnableAndroidTtsFallback, true);
         EnableTurboStart = Preferences.Default.Get(KeyEnableTurboStart, false);
+        TurboMinFirstChunkLength = Preferences.Default.Get(KeyTurboMinFirstChunkLength, 85);
+        if (TurboMinFirstChunkLength <= 0)
+        {
+            TurboMinFirstChunkLength = 85;
+        }
         FallbackLanguageCode = Preferences.Default.Get(KeyFallbackLanguageCode, string.Empty);
         FallbackLanguageName = Preferences.Default.Get(KeyFallbackLanguageName, "Default (System Language)");
         FallbackVoiceId = Preferences.Default.Get(KeyFallbackVoiceId, string.Empty);
@@ -100,6 +107,7 @@ public class AppSettingsService : IAppSettingsService
         Preferences.Default.Set(KeyCropFrameEnabled, IsCropFrameEnabled);
         Preferences.Default.Set(KeyEnableAndroidTtsFallback, EnableAndroidTtsFallback);
         Preferences.Default.Set(KeyEnableTurboStart, EnableTurboStart);
+        Preferences.Default.Set(KeyTurboMinFirstChunkLength, TurboMinFirstChunkLength);
         Preferences.Default.Set(KeyFallbackLanguageCode, FallbackLanguageCode);
         Preferences.Default.Set(KeyFallbackLanguageName, FallbackLanguageName);
         Preferences.Default.Set(KeyFallbackVoiceId, FallbackVoiceId);

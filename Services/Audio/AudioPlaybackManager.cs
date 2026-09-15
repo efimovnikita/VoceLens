@@ -68,9 +68,9 @@ public class AudioPlaybackManager : IAudioPlaybackManager
         }
 
         UpdateState(AppProcessingState.TextChunking, "Splitting text into chunks...");
-        var split = _textChunker.SplitIntoChunks(fullText, _settingsService.MaxChunkLength, _settingsService.EnableTurboStart);
+        var split = _textChunker.SplitIntoChunks(fullText, _settingsService.MaxChunkLength, _settingsService.EnableTurboStart, _settingsService.TurboMinFirstChunkLength);
         _chunks.AddRange(split);
-        AppLog.Info($"Text split into {_chunks.Count} chunks (total {fullText.Length} chars, max: {_settingsService.MaxChunkLength}, TurboStart: {_settingsService.EnableTurboStart})", "TTS");
+        AppLog.Info($"Text split into {_chunks.Count} chunks (total {fullText.Length} chars, max: {_settingsService.MaxChunkLength}, TurboStart: {_settingsService.EnableTurboStart}, minFirstChunk: {_settingsService.TurboMinFirstChunkLength})", "TTS");
 
         if (_chunks.Count == 0)
         {
@@ -122,9 +122,9 @@ public class AudioPlaybackManager : IAudioPlaybackManager
             }
             else
             {
-                // If chunk is currently being preloaded in background, wait briefly (up to 3.5s) for it to complete
+                // If chunk is currently being preloaded in background, wait up to 6.0s for it to complete
                 int attempts = 0;
-                while (IsPreloading(_currentIndex) && attempts < 35)
+                while (IsPreloading(_currentIndex) && attempts < 60)
                 {
                     if (cancellationToken.IsCancellationRequested || _isPaused)
                         return;
